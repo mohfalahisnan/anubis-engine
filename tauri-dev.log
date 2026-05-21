@@ -1,0 +1,1 @@
+[2m2026-05-21T16:56:54.315153Z[0m [31mERROR[0m [2manubis_engine_lib[0m[2m:[0m failed to run Anubis OS: failed to initialize plugin `fs`: Error deserializing 'plugins.fs' within your Tauri configuration: unknown field `scope`, expected `requireLiteralLeadingDot`

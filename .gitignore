@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tauri / Rust
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+gen/schemas/
+
+# Models and Binaries
+# We ignore the actual models if they are large, but track the folders
+models/*/model.onnx
+.fastembed_cache/
+src-tauri/.fastembed_cache/
+
+# OS/Editor
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vite
+*.tsbuildinfo
