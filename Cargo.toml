@@ -7,3 +7,21 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# Faster `tauri dev` rebuilds: minimal debuginfo + max codegen parallelism for
+# our crate. Deps stay optimized so runtime stays fast.
+[profile.dev]
+debug = "line-tables-only"
+codegen-units = 256
+incremental = true
+
+[profile.dev.build-override]
+opt-level = 0
+debug = false
+
+# Bumping deps to opt-level 1 makes runtime noticeably faster (esp. indexing,
+# fastembed, sqlite) at the cost of a ONE-TIME rebuild. After that, our crate
+# stays the only thing that recompiles incrementally.
+[profile.dev.package."*"]
+opt-level = 1
+debug = false

@@ -83,6 +83,8 @@ pub struct QueryResult {
     pub score_bm25: f32,
     pub score_vec: f32,
     pub score_graph: f32,
+    pub score_entity: f32,
+    pub score_centrality: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,7 +111,13 @@ mod tests {
 
     #[test]
     fn serializes_frontend_enums_as_lowercase() {
-        assert_eq!(serde_json::to_string(&DocFormat::Markdown).expect("json"), "\"markdown\"");
-        assert_eq!(serde_json::to_string(&IndexStatus::Running).expect("json"), "\"running\"");
+        assert_eq!(
+            serde_json::to_string(&DocFormat::Markdown).expect("json"),
+            "\"markdown\""
+        );
+        assert_eq!(
+            serde_json::to_string(&IndexStatus::Running).expect("json"),
+            "\"running\""
+        );
     }
 }

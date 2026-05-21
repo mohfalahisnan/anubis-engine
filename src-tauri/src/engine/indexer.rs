@@ -7,10 +7,11 @@ use walkdir::WalkDir;
 use crate::{
     chunker::sliding,
     embedder::local,
+    entities,
     graph::builder,
     parser,
     store::{
-        chunks, db,
+        chunks, db, entities as entity_store,
         graph_store::{self},
         vectors,
     },
@@ -51,7 +52,14 @@ async fn index_folder_inner(
     let paths = collect_supported_files(Path::new(path));
     emit_progress(&app, paths.len(), 0, "", IndexStatus::Running, Vec::new());
     index_paths(&paths, state, app.clone()).await?;
-    emit_progress(&app, paths.len(), paths.len(), "", IndexStatus::Done, Vec::new());
+    emit_progress(
+        &app,
+        paths.len(),
+        paths.len(),
+        "",
+        IndexStatus::Done,
+        Vec::new(),
+    );
     Ok(())
 }
 
@@ -86,7 +94,14 @@ async fn index_paths(
     if errors.is_empty() {
         Ok(())
     } else {
-        emit_progress(&app, paths.len(), paths.len(), "", IndexStatus::Error, errors);
+        emit_progress(
+            &app,
+            paths.len(),
+            paths.len(),
+            "",
+            IndexStatus::Error,
+            errors,
+        );
         Ok(())
     }
 }
@@ -118,22 +133,55 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         status: "pending".to_string(),
         error_msg: None,
     };
+
     let chunks_for_doc = sliding::chunk_document(&parsed);
     let texts: Vec<String> = chunks_for_doc
         .iter()
         .map(|chunk| chunk.content.clone())
         .collect();
-    let embeddings = local::deterministic_embed_batch(&texts);
-    let edges = builder::build_edges(&chunks_for_doc, &embeddings);
+    // Real dense embeddings (fastembed AllMiniLML6V2) — same space the query
+    // path uses. Falls back to the deterministic embedder ONLY on hard errors
+    // so a single broken file doesn't poison the entire index.
+    let embeddings = {
+        let mut embedder = state.embedder.lock().await;
+        match local::embed_batch(&mut embedder, &texts) {
+            Ok(vectors) => vectors,
+            Err(error) => {
+                tracing::warn!(
+                    "fastembed failed on {}: {} — falling back to deterministic",
+                    parsed.path,
+                    error
+                );
+                local::deterministic_embed_batch(&texts)
+            }
+        }
+    };
+    let entity_hits = entities::extract_from_chunks(&chunks_for_doc);
 
+    // Snapshot existing vectors from other docs (for cross-doc edges) BEFORE
+    // we write the new doc's chunks/vectors. Done under one db lock.
+    let mut all_edges = Vec::new();
     {
         let mut db = state.db.lock().await;
+
+        let existing_vectors = vectors::vectors_excluding_doc(&db, &parsed.doc_id)?;
+
         db::upsert_document(&db, &doc)?;
         chunks::replace_doc_chunks(&mut db, &parsed.doc_id, &chunks_for_doc)?;
         for (chunk, embedding) in chunks_for_doc.iter().zip(embeddings.iter()) {
             vectors::upsert_vector(&db, &chunk.id, embedding)?;
         }
-        graph_store::replace_edges(&mut db, &edges)?;
+
+        // Persist entities; then derive shared_entity edges from the DB.
+        entity_store::insert_entities(&db, &entity_hits)?;
+
+        let semantic_edges = builder::build_edges(&chunks_for_doc, &embeddings, &existing_vectors);
+        let shared_edges = entity_store::build_shared_entity_edges(&db, &parsed.doc_id)?;
+
+        all_edges.extend(semantic_edges);
+        all_edges.extend(shared_edges);
+
+        graph_store::upsert_edges(&mut db, &all_edges)?;
         db::mark_document_status(&db, &parsed.doc_id, "indexed", None)?;
     }
 
@@ -143,7 +191,13 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
             .map_err(|error| EngineError::Embed(error.to_string()))?;
     }
 
-    tracing::info!("indexed {}", parsed.path);
+    tracing::info!(
+        "indexed {} ({} chunks, {} edges, {} entities)",
+        parsed.path,
+        chunks_for_doc.len(),
+        all_edges.len(),
+        entity_hits.len(),
+    );
     Ok(())
 }
 
@@ -163,8 +217,20 @@ fn is_supported(path: &Path) -> bool {
             .and_then(|extension| extension.to_str())
             .map(|extension| extension.to_ascii_lowercase())
             .as_deref(),
-        Some("md" | "txt" | "pdf" | "docx" | "xlsx" | "png" | "jpg" | "jpeg" | "webp" | "tiff"
-            | "mp4" | "mov" | "avi")
+        Some(
+            "md" | "txt"
+                | "pdf"
+                | "docx"
+                | "xlsx"
+                | "png"
+                | "jpg"
+                | "jpeg"
+                | "webp"
+                | "tiff"
+                | "mp4"
+                | "mov"
+                | "avi"
+        )
     )
 }
 

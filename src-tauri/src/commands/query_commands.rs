@@ -3,7 +3,8 @@ use tauri::State;
 use crate::{
     embedder::local,
     engine::state::AppState,
-    store::{chunks, graph_store},
+    query::hybrid::{run_query, QueryOpts},
+    store::{chunks, graph_store, graph_store::GraphOverview},
     types::{Chunk, QueryResult},
 };
 
@@ -11,12 +12,28 @@ use crate::{
 pub async fn query(
     q: String,
     limit: Option<usize>,
+    depth: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<Vec<QueryResult>, String> {
-    let embedding = local::deterministic_embedding(&q);
+    let limit = limit.unwrap_or(10);
+    let depth = depth.unwrap_or(1).min(3);
+
+    // Real fastembed dense embedding for the query — same model as indexing.
+    let query_embedding = {
+        let mut embedder = state.embedder.lock().await;
+        local::embed_query(&mut embedder, &q).map_err(|e| e.to_string())?
+    };
+
     let db = state.db.lock().await;
-    crate::query::hybrid::query_with_embedding(&db, &embedding, limit.unwrap_or(10))
-        .map_err(|error| error.to_string())
+    let fts = state.fts.lock().await;
+    run_query(
+        &db,
+        &fts,
+        &q,
+        &query_embedding,
+        QueryOpts { limit, depth },
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -28,6 +45,49 @@ pub async fn get_chunk_neighbors(
     let db = state.db.lock().await;
     graph_store::chunk_neighbors(&db, &chunk_id, depth.unwrap_or(1) * 50)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_graph_overview(
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<GraphOverview, String> {
+    let db = state.db.lock().await;
+    graph_store::graph_overview(&db, limit.unwrap_or(250)).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_graph_neighborhood(
+    chunk_id: String,
+    depth: Option<usize>,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<GraphOverview, String> {
+    let db = state.db.lock().await;
+    graph_store::graph_neighborhood(
+        &db,
+        &chunk_id,
+        depth.unwrap_or(2).min(3),
+        limit.unwrap_or(160),
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn get_search_neighborhood(
+    chunk_ids: Vec<String>,
+    depth: Option<usize>,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<GraphOverview, String> {
+    let db = state.db.lock().await;
+    graph_store::graph_search_neighborhood(
+        &db,
+        &chunk_ids,
+        depth.unwrap_or(1).min(3),
+        limit.unwrap_or(200),
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

@@ -242,13 +242,24 @@ pub fn get_index_stats(conn: &Connection) -> Result<serde_json::Value, EngineErr
     let chunks: i64 = conn.query_row("SELECT COUNT(*) FROM chunks", [], |row| row.get(0))?;
     let graph_edges: i64 =
         conn.query_row("SELECT COUNT(*) FROM graph_edges", [], |row| row.get(0))?;
+    let entities: i64 = conn.query_row("SELECT COUNT(*) FROM entities", [], |row| row.get(0))?;
     let last_indexed: Option<String> =
-        conn.query_row("SELECT MAX(indexed_at) FROM documents", [], |row| row.get(0))?;
+        conn.query_row("SELECT MAX(indexed_at) FROM documents", [], |row| {
+            row.get(0)
+        })?;
+
+    let edges_by_type = crate::store::graph_store::edge_count_by_type(conn)?;
+    let edges_by_type_json: serde_json::Map<String, serde_json::Value> = edges_by_type
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::from(v)))
+        .collect();
 
     Ok(json!({
         "documents": documents,
         "chunks": chunks,
         "graph_edges": graph_edges,
+        "entities": entities,
+        "edges_by_type": edges_by_type_json,
         "last_indexed": last_indexed,
     }))
 }
@@ -271,7 +282,10 @@ fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentRecord> 
 
 #[cfg(test)]
 mod tests {
-    use super::{delete_document, get_document_by_path, get_index_stats, migrate, upsert_document, DocumentRecord};
+    use super::{
+        delete_document, get_document_by_path, get_index_stats, migrate, upsert_document,
+        DocumentRecord,
+    };
     use crate::types::DocFormat;
 
     #[test]

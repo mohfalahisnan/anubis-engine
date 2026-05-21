@@ -34,7 +34,11 @@ pub fn deterministic_embedding(text: &str) -> Vec<f32> {
         embedding[index] += 1.0;
     }
 
-    let norm = embedding.iter().map(|value| value * value).sum::<f32>().sqrt();
+    let norm = embedding
+        .iter()
+        .map(|value| value * value)
+        .sum::<f32>()
+        .sqrt();
     if norm > 0.0 {
         for value in &mut embedding {
             *value /= norm;
@@ -58,7 +62,11 @@ mod tests {
     #[test]
     fn deterministic_embedding_has_expected_dimension_and_norm() {
         let embedding = deterministic_embedding("promo printer thermal");
-        let norm = embedding.iter().map(|value| value * value).sum::<f32>().sqrt();
+        let norm = embedding
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
 
         assert_eq!(embedding.len(), EMBEDDING_DIM);
         assert!((norm - 1.0).abs() < 0.00001);

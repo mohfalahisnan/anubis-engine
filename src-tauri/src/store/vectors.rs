@@ -58,9 +58,41 @@ pub fn upsert_vector(
             embedding = excluded.embedding,
             dim = excluded.dim
         "#,
-        params![chunk_id, encode_embedding(embedding), embedding.len() as i64],
+        params![
+            chunk_id,
+            encode_embedding(embedding),
+            embedding.len() as i64
+        ],
     )?;
     Ok(())
+}
+
+/// Existing chunk vectors EXCLUDING those belonging to the given document.
+/// Used by the indexer to build cross-document semantic edges without
+/// re-comparing against the document being indexed.
+pub fn vectors_excluding_doc(
+    conn: &Connection,
+    exclude_doc_id: &str,
+) -> Result<Vec<(String, String, Vec<f32>)>, EngineError> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT v.chunk_id, c.doc_id, v.embedding
+        FROM vectors v
+        JOIN chunks c ON c.id = v.chunk_id
+        WHERE c.doc_id != ?1
+        "#,
+    )?;
+    let rows = stmt.query_map([exclude_doc_id], |row| {
+        let chunk_id: String = row.get(0)?;
+        let doc_id: String = row.get(1)?;
+        let blob: Vec<u8> = row.get(2)?;
+        Ok((chunk_id, doc_id, decode_embedding(&blob)))
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
 }
 
 pub fn search_vectors(

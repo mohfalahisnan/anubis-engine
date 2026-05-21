@@ -65,6 +65,8 @@ pub fn query_result_for_chunk(
     score_bm25: f32,
     score_vec: f32,
     score_graph: f32,
+    score_entity: f32,
+    score_centrality: f32,
 ) -> Result<Option<QueryResult>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
@@ -87,6 +89,8 @@ pub fn query_result_for_chunk(
             score_bm25,
             score_vec,
             score_graph,
+            score_entity,
+            score_centrality,
         })),
         None => Ok(None),
     }

@@ -18,10 +18,12 @@ pub fn parse(path: &Path) -> Result<ParsedDoc, EngineError> {
     let mut pages = Vec::new();
 
     for page_num in document.get_pages().keys() {
-        let text = document.extract_text(&[*page_num]).map_err(|error| EngineError::Parse {
-            path: path.to_string_lossy().into_owned(),
-            msg: error.to_string(),
-        })?;
+        let text = document
+            .extract_text(&[*page_num])
+            .map_err(|error| EngineError::Parse {
+                path: path.to_string_lossy().into_owned(),
+                msg: error.to_string(),
+            })?;
         pages.push(ParsedPage {
             page_num: Some(*page_num),
             text,

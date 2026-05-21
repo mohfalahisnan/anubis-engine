@@ -11,15 +11,23 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.1.0",
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
     "@vitejs/plugin-react": "latest",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
     "react": "latest",
     "react-dom": "latest",
     "react-force-graph-2d": "^1.29.1",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss": "^4.0.0",
     "typescript": "latest",
     "vite": "latest"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.11.2",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3"

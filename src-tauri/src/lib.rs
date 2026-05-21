@@ -2,6 +2,7 @@ pub mod chunker;
 pub mod commands;
 pub mod embedder;
 pub mod engine;
+pub mod entities;
 pub mod graph;
 pub mod ocr;
 pub mod parser;
@@ -41,6 +42,7 @@ fn try_run() -> tauri::Result<()> {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data)?;
@@ -58,6 +60,9 @@ fn try_run() -> tauri::Result<()> {
             commands::index_commands::reset_index,
             commands::query_commands::query,
             commands::query_commands::get_chunk_neighbors,
+            commands::query_commands::get_graph_overview,
+            commands::query_commands::get_graph_neighborhood,
+            commands::query_commands::get_search_neighborhood,
             commands::query_commands::get_doc_chunks,
             commands::status_commands::get_index_stats,
             commands::status_commands::list_documents,
