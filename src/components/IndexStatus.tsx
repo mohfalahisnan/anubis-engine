@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Loader2,
   Play,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -203,7 +204,12 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
               </>
             ) : (
               <>
-                <Play className="size-4" /> Index
+                {hasIndex ? (
+                  <RefreshCw className="size-4" />
+                ) : (
+                  <Play className="size-4" />
+                )}
+                {hasIndex ? "Reindex" : "Index"}
               </>
             )}
           </Button>

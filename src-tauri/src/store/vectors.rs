@@ -79,7 +79,8 @@ pub fn vectors_excluding_doc(
         SELECT v.chunk_id, c.doc_id, v.embedding
         FROM vectors v
         JOIN chunks c ON c.id = v.chunk_id
-        WHERE c.doc_id != ?1
+        JOIN documents d ON d.id = c.doc_id
+        WHERE c.doc_id != ?1 AND d.status = 'indexed'
         "#,
     )?;
     let rows = stmt.query_map([exclude_doc_id], |row| {
@@ -100,7 +101,15 @@ pub fn search_vectors(
     query: &[f32],
     limit: usize,
 ) -> Result<Vec<VectorHit>, EngineError> {
-    let mut stmt = conn.prepare("SELECT chunk_id, embedding FROM vectors")?;
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT v.chunk_id, v.embedding
+        FROM vectors v
+        JOIN chunks c ON c.id = v.chunk_id
+        JOIN documents d ON d.id = c.doc_id
+        WHERE d.status = 'indexed'
+        "#,
+    )?;
     let rows = stmt.query_map([], |row| {
         let chunk_id: String = row.get(0)?;
         let blob: Vec<u8> = row.get(1)?;

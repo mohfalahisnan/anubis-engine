@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
@@ -12,21 +14,108 @@ const SHARED_ENTITY_WEIGHT_DATE: f32 = 0.6;
 
 pub fn insert_entities(conn: &Connection, hits: &[EntityHit]) -> Result<(), EngineError> {
     for hit in hits {
+        let entity_id = Uuid::new_v4().to_string();
+        let normalized_value = normalize_entity_value(&hit.value);
         conn.execute(
             r#"
-            INSERT INTO entities (id, chunk_id, entity_type, value, confidence)
-            VALUES (?1, ?2, ?3, ?4, ?5)
+            INSERT INTO entities (id, chunk_id, entity_type, value, normalized_value, confidence)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             "#,
             params![
-                Uuid::new_v4().to_string(),
+                entity_id,
                 hit.chunk_id,
                 hit.entity_type,
                 hit.value,
+                normalized_value,
                 hit.confidence as f64,
             ],
         )?;
+        for term in entity_terms_for_value(&normalized_value) {
+            conn.execute(
+                r#"
+                INSERT OR IGNORE INTO entity_terms (entity_id, chunk_id, term)
+                VALUES (?1, ?2, ?3)
+                "#,
+                params![entity_id, hit.chunk_id, term],
+            )?;
+        }
     }
     Ok(())
+}
+
+pub fn normalize_entity_value(value: &str) -> String {
+    if let Some(date) = normalize_date(value) {
+        return date;
+    }
+
+    let mut normalized = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_alphanumeric() {
+            for lower in ch.to_lowercase() {
+                normalized.push(lower);
+            }
+        } else {
+            normalized.push(' ');
+        }
+    }
+    normalized.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+pub fn entity_terms_for_value(normalized_value: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    normalized_value
+        .split_whitespace()
+        .filter(|term| term.len() >= 2)
+        .filter_map(|term| {
+            if seen.insert(term.to_string()) {
+                Some(term.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn normalize_date(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    let sep = if trimmed.contains('/') {
+        '/'
+    } else if trimmed.contains('-') {
+        '-'
+    } else {
+        return None;
+    };
+    let parts: Vec<&str> = trimmed.split(sep).collect();
+    if parts.len() != 3 || parts.iter().any(|part| part.is_empty()) {
+        return None;
+    }
+    if !parts
+        .iter()
+        .all(|part| part.chars().all(|ch| ch.is_ascii_digit()))
+    {
+        return None;
+    }
+
+    let nums = parts
+        .iter()
+        .map(|part| part.parse::<u32>())
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    let (year, month, day) = if parts[0].len() == 4 {
+        (nums[0], nums[1], nums[2])
+    } else {
+        let year = if nums[2] < 100 {
+            2000 + nums[2]
+        } else {
+            nums[2]
+        };
+        (year, nums[1], nums[0])
+    };
+
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some(format!("{year:04}-{month:02}-{day:02}"))
 }
 
 /// For the given doc's chunks, find chunks in OTHER docs that share entity
@@ -38,7 +127,7 @@ pub fn build_shared_entity_edges(
 ) -> Result<Vec<GraphEdge>, EngineError> {
     let mut new_stmt = conn.prepare(
         r#"
-        SELECT e.chunk_id, e.entity_type, e.value
+        SELECT e.chunk_id, e.entity_type, COALESCE(e.normalized_value, e.value)
         FROM entities e
         JOIN chunks c ON c.id = e.chunk_id
         WHERE c.doc_id = ?1
@@ -55,7 +144,7 @@ pub fn build_shared_entity_edges(
         SELECT e.chunk_id
         FROM entities e
         JOIN chunks c ON c.id = e.chunk_id
-        WHERE e.entity_type = ?1 AND e.value = ?2 AND c.doc_id != ?3
+        WHERE e.entity_type = ?1 AND COALESCE(e.normalized_value, e.value) = ?2 AND c.doc_id != ?3
         LIMIT ?4
         "#,
     )?;
@@ -138,5 +227,48 @@ mod tests {
         let edges = build_shared_entity_edges(&conn, "doc-a").unwrap();
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].edge_type, "shared_entity");
+    }
+
+    #[test]
+    fn stores_normalized_entity_values_and_terms() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed(&conn, "doc-a", &["a1"]);
+
+        insert_entities(
+            &conn,
+            &[EntityHit {
+                chunk_id: "a1".to_string(),
+                entity_type: "PHRASE".to_string(),
+                value: "Anubis OS".to_string(),
+                confidence: 0.8,
+            }],
+        )
+        .unwrap();
+
+        let normalized: String = conn
+            .query_row(
+                "SELECT normalized_value FROM entities WHERE chunk_id = 'a1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let terms: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM entity_terms WHERE chunk_id = 'a1' AND term IN ('anubis', 'os')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(normalized, "anubis os");
+        assert_eq!(terms, 2);
+    }
+
+    #[test]
+    fn normalizes_date_variants_to_same_value() {
+        assert_eq!(normalize_entity_value("21/05/2026"), "2026-05-21");
+        assert_eq!(normalize_entity_value("21-05-26"), "2026-05-21");
+        assert_eq!(normalize_entity_value("2026-05-21"), "2026-05-21");
     }
 }

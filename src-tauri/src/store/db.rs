@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::{types::DocFormat, EngineError};
 
-pub const SCHEMA_VERSION: i32 = 1;
+pub const SCHEMA_VERSION: i32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DocumentRecord {
@@ -79,7 +79,15 @@ pub fn migrate(conn: &Connection) -> Result<(), EngineError> {
             chunk_id    TEXT NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
             entity_type TEXT NOT NULL,
             value       TEXT NOT NULL,
+            normalized_value TEXT,
             confidence  REAL NOT NULL DEFAULT 1.0
+        );
+
+        CREATE TABLE IF NOT EXISTS entity_terms (
+            entity_id   TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+            chunk_id    TEXT NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+            term        TEXT NOT NULL,
+            PRIMARY KEY (entity_id, term)
         );
 
         CREATE TABLE IF NOT EXISTS communities (
@@ -100,8 +108,79 @@ pub fn migrate(conn: &Connection) -> Result<(), EngineError> {
         CREATE INDEX IF NOT EXISTS idx_docs_status ON documents(status);
         "#,
     )?;
+    migrate_entity_search_schema(conn)?;
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
+}
+
+fn migrate_entity_search_schema(conn: &Connection) -> Result<(), EngineError> {
+    if !column_exists(conn, "entities", "normalized_value")? {
+        conn.execute("ALTER TABLE entities ADD COLUMN normalized_value TEXT", [])?;
+    }
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS entity_terms (
+            entity_id   TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+            chunk_id    TEXT NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+            term        TEXT NOT NULL,
+            PRIMARY KEY (entity_id, term)
+        );
+        CREATE INDEX IF NOT EXISTS idx_entities_normalized ON entities(normalized_value);
+        CREATE INDEX IF NOT EXISTS idx_entity_terms_term ON entity_terms(term);
+        "#,
+    )?;
+
+    let mut stmt =
+        conn.prepare("SELECT id, chunk_id, value, COALESCE(normalized_value, '') FROM entities")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+        ))
+    })?;
+    let entities = rows.collect::<Result<Vec<_>, _>>()?;
+    drop(stmt);
+
+    for (entity_id, chunk_id, value, existing_normalized) in entities {
+        let normalized = if existing_normalized.is_empty() {
+            let normalized = crate::store::entities::normalize_entity_value(&value);
+            conn.execute(
+                "UPDATE entities SET normalized_value = ?1 WHERE id = ?2",
+                params![normalized, entity_id],
+            )?;
+            normalized
+        } else {
+            existing_normalized
+        };
+        conn.execute(
+            "DELETE FROM entity_terms WHERE entity_id = ?1",
+            [&entity_id],
+        )?;
+        for term in crate::store::entities::entity_terms_for_value(&normalized) {
+            conn.execute(
+                r#"
+                INSERT OR IGNORE INTO entity_terms (entity_id, chunk_id, term)
+                VALUES (?1, ?2, ?3)
+                "#,
+                params![entity_id, chunk_id, term],
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, EngineError> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for row in rows {
+        if row? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 pub fn upsert_document(conn: &Connection, doc: &DocumentRecord) -> Result<(), EngineError> {
@@ -226,6 +305,7 @@ pub fn reset_index(conn: &Connection) -> Result<(), EngineError> {
     conn.execute_batch(
         r#"
         DELETE FROM communities;
+        DELETE FROM entity_terms;
         DELETE FROM entities;
         DELETE FROM graph_edges;
         DELETE FROM vectors;
@@ -312,9 +392,26 @@ mod tests {
             )
             .expect("index count");
 
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
         assert_eq!(documents_exists, 1);
         assert_eq!(chunks_doc_index_exists, 1);
+        let normalized_column_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('entities') WHERE name = 'normalized_value'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("normalized column count");
+        let entity_terms_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'entity_terms'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("entity_terms table count");
+
+        assert_eq!(normalized_column_exists, 1);
+        assert_eq!(entity_terms_exists, 1);
     }
 
     #[test]

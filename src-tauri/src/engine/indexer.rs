@@ -209,7 +209,6 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         all_edges.extend(shared_edges);
 
         graph_store::upsert_edges(&mut db, &all_edges)?;
-        db::mark_document_status(&db, &parsed.doc_id, "indexed", None)?;
     }
 
     {
@@ -218,6 +217,11 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
             .map_err(|error| EngineError::Embed(error.to_string()))?;
         fts::replace_chunks(&fts, &chunks_for_doc)
             .map_err(|error| EngineError::Embed(error.to_string()))?;
+    }
+
+    {
+        let db = state.db.lock().await;
+        db::mark_document_status(&db, &parsed.doc_id, "indexed", None)?;
     }
 
     tracing::info!(

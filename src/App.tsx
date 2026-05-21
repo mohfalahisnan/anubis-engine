@@ -198,6 +198,14 @@ export default function App() {
     }
   }
 
+  async function handleReindexDocument(document: DocumentRow) {
+    await invoke("index_file", { path: document.path });
+    setRefreshKey((value) => value + 1);
+    if (selectedDocument?.id === document.id) {
+      await handleSelectDocument(document);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-screen w-full">
       <aside className="flex w-[320px] shrink-0 flex-col gap-4 border-r border-[var(--color-border)] bg-[var(--color-card)]/40 p-5 backdrop-blur">
@@ -223,6 +231,7 @@ export default function App() {
           refreshKey={refreshKey}
           selectedId={selectedDocument?.id ?? null}
           onSelect={handleSelectDocument}
+          onReindex={handleReindexDocument}
         />
       </aside>
 

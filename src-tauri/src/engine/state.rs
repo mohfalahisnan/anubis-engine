@@ -17,6 +17,8 @@ impl AppState {
     pub fn new(db_path: &std::path::Path, fts_path: &std::path::Path) -> Result<Self, EngineError> {
         let db = store::db::open(db_path)?;
         let fts = store::fts::open_or_create(fts_path)?;
+        store::fts::rebuild_from_indexed_chunks(&fts, &db)?;
+        tracing::info!("reconciled full-text index from SQLite chunks");
         let embedder = TextEmbedding::try_new(InitOptions::new(EmbeddingModel::AllMiniLML6V2))
             .map_err(|error| EngineError::Embed(error.to_string()))?;
 

@@ -33,23 +33,27 @@ pub async fn remove_document(doc_id: String, state: State<'_, AppState>) -> Resu
     };
 
     {
-        let db = state.db.lock().await;
-        db::delete_document(&db, &doc_id).map_err(|error| error.to_string())?;
+        let fts = state.fts.lock().await;
+        fts::delete_chunks(&fts, &chunk_ids).map_err(|error| error.to_string())?;
     }
 
-    let fts = state.fts.lock().await;
-    fts::delete_chunks(&fts, &chunk_ids).map_err(|error| error.to_string())
+    {
+        let db = state.db.lock().await;
+        db::delete_document(&db, &doc_id).map_err(|error| error.to_string())
+    }
 }
 
 #[tauri::command]
 pub async fn reset_index(state: State<'_, AppState>) -> Result<(), String> {
     {
-        let db = state.db.lock().await;
-        db::reset_index(&db).map_err(|error| error.to_string())?;
+        let fts = state.fts.lock().await;
+        fts::clear(&fts).map_err(|error| error.to_string())?;
     }
 
-    let fts = state.fts.lock().await;
-    fts::clear(&fts).map_err(|error| error.to_string())
+    {
+        let db = state.db.lock().await;
+        db::reset_index(&db).map_err(|error| error.to_string())
+    }
 }
 
 #[cfg(test)]

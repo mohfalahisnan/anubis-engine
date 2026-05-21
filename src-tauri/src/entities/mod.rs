@@ -28,6 +28,7 @@ pub fn extract_from_chunks(chunks: &[Chunk]) -> Vec<EntityHit> {
     let mut hits = Vec::new();
     for chunk in chunks {
         hits.extend(extract_dates(&chunk.id, &chunk.content));
+        hits.extend(extract_phrases(&chunk.id, &chunk.content));
         hits.extend(extract_proper_nouns(&chunk.id, &chunk.content));
         hits.extend(extract_keywords(&chunk.id, &chunk.content));
     }
@@ -155,6 +156,62 @@ fn extract_keywords(chunk_id: &str, text: &str) -> Vec<EntityHit> {
         .collect()
 }
 
+fn extract_phrases(chunk_id: &str, text: &str) -> Vec<EntityHit> {
+    let mut seen = HashSet::new();
+    let raw_tokens: Vec<&str> = tokens(text).collect();
+    let mut out = Vec::new();
+
+    for window in raw_tokens.windows(2) {
+        let left = clean_token(window[0]);
+        let right = clean_token(window[1]);
+        if left.is_empty() || right.is_empty() {
+            continue;
+        }
+
+        let capitalized_phrase = starts_upper(left) && starts_upper(right);
+        let content_phrase = is_content_term(left) && is_content_term(right);
+        if !capitalized_phrase && !content_phrase {
+            continue;
+        }
+
+        let phrase = format!("{} {}", left, right);
+        let key = phrase.to_lowercase();
+        if seen.insert(key) {
+            out.push(EntityHit {
+                chunk_id: chunk_id.to_string(),
+                entity_type: "PHRASE".to_string(),
+                value: phrase,
+                confidence: if capitalized_phrase { 0.85 } else { 0.65 },
+            });
+        }
+        if out.len() >= 8 {
+            break;
+        }
+    }
+
+    out
+}
+
+fn clean_token(token: &str) -> &str {
+    token.trim_matches(|ch: char| !ch.is_alphanumeric())
+}
+
+fn starts_upper(token: &str) -> bool {
+    token
+        .chars()
+        .next()
+        .map(|ch| ch.is_ascii_uppercase())
+        .unwrap_or(false)
+}
+
+fn is_content_term(token: &str) -> bool {
+    let lower = token.to_lowercase();
+    lower.len() >= 4
+        && lower.len() <= MAX_TOKEN_LEN
+        && lower.chars().all(|ch| ch.is_alphabetic())
+        && !STOPWORDS.contains(&lower.as_str())
+}
+
 fn tokens(text: &str) -> impl Iterator<Item = &str> {
     text.split(|c: char| !c.is_alphanumeric() && c != '.' && c != '\'')
         .filter(|t| !t.is_empty())
@@ -228,5 +285,21 @@ mod tests {
             .collect();
         assert!(proper.contains(&"Anubis"));
         assert!(proper.contains(&"Indonesia"));
+    }
+
+    #[test]
+    fn extracts_capitalized_and_content_phrases() {
+        let hits = extract_from_chunks(&[chunk(
+            "c1",
+            "Anubis OS indexes thermal printer manuals for support.",
+        )]);
+        let phrases: Vec<&str> = hits
+            .iter()
+            .filter(|h| h.entity_type == "PHRASE")
+            .map(|h| h.value.as_str())
+            .collect();
+
+        assert!(phrases.contains(&"Anubis OS"));
+        assert!(phrases.contains(&"thermal printer"));
     }
 }

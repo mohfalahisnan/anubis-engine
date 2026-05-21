@@ -18,7 +18,7 @@ use rusqlite::{params, params_from_iter, Connection};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    store::{chunks::query_result_for_chunk, fts, vectors},
+    store::{chunks::query_result_for_chunk, entities as entity_store, fts, vectors},
     types::QueryResult,
     EngineError,
 };
@@ -54,7 +54,10 @@ pub struct QueryOpts {
 
 impl Default for QueryOpts {
     fn default() -> Self {
-        Self { limit: 10, depth: 1 }
+        Self {
+            limit: 10,
+            depth: 1,
+        }
     }
 }
 
@@ -144,14 +147,19 @@ pub fn run_query(
     // Pool: union of all three signals
     let mut pool: HashMap<String, ScoreParts> = HashMap::new();
     for (id, score) in &vector_scores {
-        pool.entry(id.clone()).or_insert_with(|| ScoreParts::new(id.clone())).score_vec = *score;
+        pool.entry(id.clone())
+            .or_insert_with(|| ScoreParts::new(id.clone()))
+            .score_vec = *score;
     }
     for (id, score) in &bm25_scores {
-        pool.entry(id.clone()).or_insert_with(|| ScoreParts::new(id.clone())).score_bm25 = *score;
+        pool.entry(id.clone())
+            .or_insert_with(|| ScoreParts::new(id.clone()))
+            .score_bm25 = *score;
     }
     for (id, score) in &entity_scores {
-        pool.entry(id.clone()).or_insert_with(|| ScoreParts::new(id.clone())).score_entity =
-            *score;
+        pool.entry(id.clone())
+            .or_insert_with(|| ScoreParts::new(id.clone()))
+            .score_entity = *score;
     }
 
     // (4) Graph expansion at depth > 0: add chunks reachable from top seeds.
@@ -218,7 +226,9 @@ pub fn query_with_embedding(
 
     let mut pool: HashMap<String, ScoreParts> = HashMap::new();
     for (id, score) in &vector_scores {
-        pool.entry(id.clone()).or_insert_with(|| ScoreParts::new(id.clone())).score_vec = *score;
+        pool.entry(id.clone())
+            .or_insert_with(|| ScoreParts::new(id.clone()))
+            .score_vec = *score;
     }
     populate_centrality(conn, &mut pool)?;
 
@@ -278,58 +288,97 @@ fn sanitize_for_tantivy(q: &str) -> String {
         .collect()
 }
 
-/// Entity boost: chunks whose stored entity values match any query token.
-/// Score = (matches / max_matches_seen), capped to 1.0.
+/// Entity boost: exact normalized phrase first, then token overlap.
 fn match_entities(
     conn: &Connection,
     query_text: &str,
     pool_size: usize,
 ) -> Result<Vec<(String, f32)>, EngineError> {
-    let tokens: Vec<String> = query_tokens(query_text);
-    if tokens.is_empty() {
+    let query_norm = entity_store::normalize_entity_value(query_text);
+    let query_terms: HashSet<String> = entity_store::entity_terms_for_value(&query_norm)
+        .into_iter()
+        .collect();
+    if query_norm.is_empty() || query_terms.is_empty() {
         return Ok(vec![]);
     }
 
-    let placeholders = std::iter::repeat("?")
-        .take(tokens.len())
-        .collect::<Vec<_>>()
-        .join(",");
-    let sql = format!(
+    let mut stmt = conn.prepare(
         r#"
-        SELECT e.chunk_id, COUNT(DISTINCT e.value) AS matches
+        SELECT e.chunk_id, e.value, COALESCE(e.normalized_value, '')
         FROM entities e
-        WHERE LOWER(e.value) IN ({0})
-        GROUP BY e.chunk_id
-        ORDER BY matches DESC
-        LIMIT ?
+        JOIN chunks c ON c.id = e.chunk_id
+        JOIN documents d ON d.id = c.doc_id
+        WHERE d.status = 'indexed'
         "#,
-        placeholders
-    );
-
-    let mut stmt = conn.prepare(&sql)?;
-    let pool_size_i64 = pool_size as i64;
-    let bind_iter = tokens
-        .iter()
-        .map(|t| t as &dyn rusqlite::ToSql)
-        .chain(std::iter::once(&pool_size_i64 as &dyn rusqlite::ToSql))
-        .collect::<Vec<_>>();
-    let rows = stmt.query_map(bind_iter.as_slice(), |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+        ))
     })?;
 
-    let raw: Vec<(String, f32)> = rows
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .map(|(id, count)| (id, count as f32))
-        .collect();
+    let mut scores: HashMap<String, f32> = HashMap::new();
+    for row in rows {
+        let (chunk_id, value, stored_norm) = row?;
+        let entity_norm = if stored_norm.is_empty() {
+            entity_store::normalize_entity_value(&value)
+        } else {
+            stored_norm
+        };
+        let score = entity_match_score(&query_norm, &query_terms, &entity_norm);
+        if score > 0.0 {
+            *scores.entry(chunk_id).or_insert(0.0) += score;
+        }
+    }
+
+    let mut raw: Vec<(String, f32)> = scores.into_iter().collect();
+    raw.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    raw.truncate(pool_size);
     Ok(normalize(raw))
 }
 
-fn query_tokens(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric())
-        .filter(|t| t.len() >= 2)
-        .map(|t| t.to_lowercase())
-        .collect()
+fn entity_match_score(query_norm: &str, query_terms: &HashSet<String>, entity_norm: &str) -> f32 {
+    if entity_norm.is_empty() {
+        return 0.0;
+    }
+    if entity_norm == query_norm {
+        return 3.0;
+    }
+    if contains_phrase(query_norm, entity_norm) {
+        return 2.5;
+    }
+    if query_norm.len() >= 4 && contains_phrase(entity_norm, query_norm) {
+        return 2.0;
+    }
+
+    let entity_terms = entity_store::entity_terms_for_value(entity_norm);
+    if entity_terms.is_empty() {
+        return 0.0;
+    }
+    let overlap = entity_terms
+        .iter()
+        .filter(|term| query_terms.contains(term.as_str()))
+        .count();
+    if overlap == 0 {
+        return 0.0;
+    }
+    let ratio = overlap as f32 / entity_terms.len() as f32;
+    0.4 + (0.8 * ratio)
+}
+
+fn contains_phrase(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    let padded_haystack = format!(" {haystack} ");
+    let padded_needle = format!(" {needle} ");
+    padded_haystack.contains(&padded_needle)
 }
 
 fn top_seed_ids(pool: &HashMap<String, ScoreParts>, n: usize) -> Vec<String> {
@@ -477,10 +526,9 @@ fn diversify_per_doc(
     );
     let mut stmt = conn.prepare(&sql)?;
     let doc_for_chunk: HashMap<String, String> = stmt
-        .query_map(
-            params_from_iter(ids.iter().map(|s| s.as_str())),
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-        )?
+        .query_map(params_from_iter(ids.iter().map(|s| s.as_str())), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
         .collect::<Result<HashMap<_, _>, _>>()?;
 
     let mut counts: HashMap<String, usize> = HashMap::new();
@@ -535,7 +583,8 @@ mod tests {
               ('a2','doc-a',1,'invoice ledger ledger ledger',0,28,'2026-05-21T00:00:00Z'),
               ('b1','doc-b',0,'thermal printer manual',0,22,'2026-05-21T00:00:00Z');
             "#,
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     #[test]
@@ -647,7 +696,13 @@ mod tests {
         let chosen = diversify_per_doc(&conn, scores, 2, 1).unwrap();
         let docs: Vec<&str> = chosen
             .iter()
-            .map(|s| if s.chunk_id.starts_with('a') { "doc-a" } else { "doc-b" })
+            .map(|s| {
+                if s.chunk_id.starts_with('a') {
+                    "doc-a"
+                } else {
+                    "doc-b"
+                }
+            })
             .collect();
         assert!(docs.contains(&"doc-a"));
         assert!(docs.contains(&"doc-b"));
@@ -671,6 +726,37 @@ mod tests {
 
         let hits = match_entities(&conn, "Anubis", 10).unwrap();
         assert!(hits.iter().any(|(id, _)| id == "a1"));
+    }
+
+    #[test]
+    fn entity_matches_normalized_phrases_tokens_and_date_variants() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed_kb(&mut conn);
+        conn.execute(
+            "INSERT INTO entities (id, chunk_id, entity_type, value, normalized_value, confidence) VALUES ('e1','a1','PHRASE','Anubis OS','anubis os',0.9)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO entities (id, chunk_id, entity_type, value, normalized_value, confidence) VALUES ('e2','b1','PHRASE','thermal printer','thermal printer',0.8)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO entities (id, chunk_id, entity_type, value, normalized_value, confidence) VALUES ('e3','a2','DATE','21/05/2026','2026-05-21',1.0)",
+            [],
+        )
+        .unwrap();
+
+        let phrase_hits = match_entities(&conn, "how does Anubis OS search work", 10).unwrap();
+        assert_eq!(phrase_hits[0].0, "a1");
+
+        let token_hits = match_entities(&conn, "printer thermal issue", 10).unwrap();
+        assert_eq!(token_hits[0].0, "b1");
+
+        let date_hits = match_entities(&conn, "2026-05-21", 10).unwrap();
+        assert_eq!(date_hits[0].0, "a2");
     }
 
     #[test]

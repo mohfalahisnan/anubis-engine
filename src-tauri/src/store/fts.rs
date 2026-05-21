@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use rusqlite::Connection;
 use tantivy::{
     collector::TopDocs,
     doc,
@@ -97,6 +98,48 @@ pub fn clear(index: &Index) -> Result<(), EngineError> {
     Ok(())
 }
 
+pub fn rebuild_from_indexed_chunks(index: &Index, conn: &Connection) -> Result<(), EngineError> {
+    let schema = index.schema();
+    let chunk_id = schema
+        .get_field("chunk_id")
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    let content = schema
+        .get_field("content")
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    let mut writer = index
+        .writer::<TantivyDocument>(50_000_000)
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+
+    writer
+        .delete_all_documents()
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.id, c.content
+        FROM chunks c
+        JOIN documents d ON d.id = c.doc_id
+        WHERE d.status = 'indexed'
+        ORDER BY d.indexed_at ASC, c.chunk_index ASC
+        "#,
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+
+    for row in rows {
+        let (id, text) = row?;
+        writer
+            .add_document(doc!(chunk_id => id, content => text))
+            .map_err(|error| EngineError::Embed(error.to_string()))?;
+    }
+
+    writer
+        .commit()
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    Ok(())
+}
+
 pub fn search(index: &Index, query: &str, limit: usize) -> Result<Vec<FtsHit>, EngineError> {
     let schema = index.schema();
     let chunk_id_field = schema
@@ -135,7 +178,10 @@ pub fn search(index: &Index, query: &str, limit: usize) -> Result<Vec<FtsHit>, E
 
 #[cfg(test)]
 mod tests {
-    use super::{clear, create_in_ram, delete_chunks, replace_chunks, search};
+    use super::{
+        clear, create_in_ram, delete_chunks, rebuild_from_indexed_chunks, replace_chunks, search,
+    };
+    use crate::store::db::migrate;
     use crate::types::Chunk;
 
     #[test]
@@ -210,5 +256,50 @@ mod tests {
         assert!(search(&index, "thermal", 5)
             .expect("search cleared index")
             .is_empty());
+    }
+
+    #[test]
+    fn rebuild_from_sqlite_indexes_only_indexed_documents() {
+        let conn = rusqlite::Connection::open_in_memory().expect("in-memory sqlite");
+        migrate(&conn).expect("migration");
+        conn.execute_batch(
+            r#"
+            INSERT INTO documents (id, path, filename, format, size_bytes, hash, indexed_at, status)
+            VALUES
+                ('doc-indexed', 'indexed.md', 'indexed.md', 'md', 1, 'h1', '2026-05-21T00:00:00Z', 'indexed'),
+                ('doc-pending', 'pending.md', 'pending.md', 'md', 1, 'h2', '2026-05-21T00:00:00Z', 'pending');
+
+            INSERT INTO chunks (id, doc_id, chunk_index, content, char_start, char_end, created_at)
+            VALUES
+                ('chunk-indexed', 'doc-indexed', 0, 'current searchable content', 0, 26, '2026-05-21T00:00:00Z'),
+                ('chunk-pending', 'doc-pending', 0, 'pending stale content', 0, 21, '2026-05-21T00:00:00Z');
+            "#,
+        )
+        .expect("seed sqlite");
+        let index = create_in_ram();
+        replace_chunks(
+            &index,
+            &[Chunk {
+                id: "stale".to_string(),
+                doc_id: "old".to_string(),
+                chunk_index: 0,
+                content: "legacy stale content".to_string(),
+                char_start: 0,
+                char_end: 20,
+                page: None,
+            }],
+        )
+        .expect("seed stale fts");
+
+        rebuild_from_indexed_chunks(&index, &conn).expect("rebuild fts");
+
+        assert!(search(&index, "legacy", 5)
+            .expect("search stale")
+            .is_empty());
+        assert!(search(&index, "pending", 5)
+            .expect("search pending")
+            .is_empty());
+        let hits = search(&index, "current", 5).expect("search current");
+        assert_eq!(hits[0].chunk_id, "chunk-indexed");
     }
 }

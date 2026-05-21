@@ -4,6 +4,7 @@ pub mod embedder;
 pub mod engine;
 pub mod entities;
 pub mod graph;
+pub mod mcp;
 pub mod ocr;
 pub mod parser;
 pub mod query;

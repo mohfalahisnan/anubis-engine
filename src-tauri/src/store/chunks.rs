@@ -73,7 +73,7 @@ pub fn query_result_for_chunk(
         SELECT c.id, c.doc_id, c.content, d.filename, c.page
         FROM chunks c
         JOIN documents d ON d.id = c.doc_id
-        WHERE c.id = ?1
+        WHERE c.id = ?1 AND d.status = 'indexed'
         "#,
     )?;
     let mut rows = stmt.query([chunk_id])?;
