@@ -11,7 +11,7 @@ use crate::{
     graph::builder,
     parser,
     store::{
-        chunks, db, entities as entity_store,
+        chunks, db, entities as entity_store, fts,
         graph_store::{self},
         vectors,
     },
@@ -107,11 +107,14 @@ async fn index_paths(
 }
 
 async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
-    let parsed = parser::parse(path)?;
+    let mut parsed = parser::parse(path)?;
     let existing = {
         let db = state.db.lock().await;
         db::get_document_by_path(&db, &parsed.path)?
     };
+    if let Some(existing_doc) = &existing {
+        parsed.doc_id = existing_doc.id.clone();
+    }
 
     if existing
         .as_ref()
@@ -135,27 +138,51 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
     };
 
     let chunks_for_doc = sliding::chunk_document(&parsed);
+    let old_chunk_ids = if existing.is_some() {
+        let db = state.db.lock().await;
+        chunks::get_doc_chunks(&db, &parsed.doc_id)?
+            .into_iter()
+            .map(|chunk| chunk.id)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     let texts: Vec<String> = chunks_for_doc
         .iter()
         .map(|chunk| chunk.content.clone())
         .collect();
-    // Real dense embeddings (fastembed AllMiniLML6V2) — same space the query
-    // path uses. Falls back to the deterministic embedder ONLY on hard errors
-    // so a single broken file doesn't poison the entire index.
-    let embeddings = {
+    let embeddings = if texts.is_empty() {
+        Vec::new()
+    } else {
         let mut embedder = state.embedder.lock().await;
-        match local::embed_batch(&mut embedder, &texts) {
+        match local::embed_batch_with_retry(&mut embedder, &texts) {
             Ok(vectors) => vectors,
             Err(error) => {
-                tracing::warn!(
-                    "fastembed failed on {}: {} — falling back to deterministic",
+                let error_msg = format!("fastembed failed: {}", error);
+                tracing::error!(
+                    "failed to embed {}; marking document error: {}",
                     parsed.path,
-                    error
+                    error_msg
                 );
-                local::deterministic_embed_batch(&texts)
+                mark_document_embedding_error(state, &doc, &old_chunk_ids, &error_msg).await?;
+                return Err(EngineError::Embed(error_msg));
             }
         }
     };
+    if embeddings.len() != chunks_for_doc.len() {
+        let error_msg = format!(
+            "embedding count mismatch: got {}, expected {}",
+            embeddings.len(),
+            chunks_for_doc.len()
+        );
+        tracing::error!(
+            "failed to embed {}; marking document error: {}",
+            parsed.path,
+            error_msg
+        );
+        mark_document_embedding_error(state, &doc, &old_chunk_ids, &error_msg).await?;
+        return Err(EngineError::Embed(error_msg));
+    }
     let entity_hits = entities::extract_from_chunks(&chunks_for_doc);
 
     // Snapshot existing vectors from other docs (for cross-doc edges) BEFORE
@@ -187,7 +214,9 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
 
     {
         let fts = state.fts.lock().await;
-        crate::store::fts::replace_chunks(&fts, &chunks_for_doc)
+        fts::delete_chunks(&fts, &old_chunk_ids)
+            .map_err(|error| EngineError::Embed(error.to_string()))?;
+        fts::replace_chunks(&fts, &chunks_for_doc)
             .map_err(|error| EngineError::Embed(error.to_string()))?;
     }
 
@@ -198,6 +227,27 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         all_edges.len(),
         entity_hits.len(),
     );
+    Ok(())
+}
+
+async fn mark_document_embedding_error(
+    state: &AppState,
+    doc: &db::DocumentRecord,
+    old_chunk_ids: &[String],
+    error_msg: &str,
+) -> Result<(), EngineError> {
+    {
+        let fts = state.fts.lock().await;
+        fts::delete_chunks(&fts, old_chunk_ids)?;
+    }
+
+    let mut error_doc = doc.clone();
+    error_doc.status = "error".to_string();
+    error_doc.error_msg = Some(error_msg.to_string());
+
+    let mut db = state.db.lock().await;
+    db::upsert_document(&db, &error_doc)?;
+    chunks::replace_doc_chunks(&mut db, &doc.id, &[])?;
     Ok(())
 }
 

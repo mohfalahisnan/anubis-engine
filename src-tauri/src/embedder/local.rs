@@ -21,6 +21,30 @@ pub fn embed_query(model: &mut TextEmbedding, text: &str) -> Result<Vec<f32>, En
         .ok_or_else(|| EngineError::Embed("empty embedding result".to_string()))
 }
 
+pub fn embed_batch_with_retry(
+    model: &mut TextEmbedding,
+    texts: &[String],
+) -> Result<Vec<Vec<f32>>, EngineError> {
+    match embed_batch(model, texts) {
+        Ok(embeddings) => Ok(embeddings),
+        Err(batch_error) => {
+            tracing::warn!(
+                "fastembed batch failed: {}; retrying chunks one by one",
+                batch_error
+            );
+            let mut embeddings = Vec::with_capacity(texts.len());
+            for text in texts {
+                let mut result = embed_batch(model, std::slice::from_ref(text))?;
+                let embedding = result
+                    .pop()
+                    .ok_or_else(|| EngineError::Embed("empty embedding result".to_string()))?;
+                embeddings.push(embedding);
+            }
+            Ok(embeddings)
+        }
+    }
+}
+
 pub fn deterministic_embedding(text: &str) -> Vec<f32> {
     let mut embedding = vec![0.0f32; EMBEDDING_DIM];
 

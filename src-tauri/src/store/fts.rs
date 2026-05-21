@@ -5,7 +5,7 @@ use tantivy::{
     doc,
     query::QueryParser,
     schema::{Schema, Value, STORED, STRING, TEXT},
-    Index, TantivyDocument,
+    Index, TantivyDocument, Term,
 };
 
 use crate::{types::Chunk, EngineError};
@@ -45,15 +45,52 @@ pub fn replace_chunks(index: &Index, chunks: &[Chunk]) -> Result<(), EngineError
         .get_field("content")
         .map_err(|error| EngineError::Embed(error.to_string()))?;
     let mut writer = index
-        .writer(50_000_000)
+        .writer::<TantivyDocument>(50_000_000)
         .map_err(|error| EngineError::Embed(error.to_string()))?;
 
     for chunk in chunks {
+        writer.delete_term(Term::from_field_text(chunk_id, &chunk.id));
         writer
             .add_document(doc!(chunk_id => chunk.id.clone(), content => chunk.content.clone()))
             .map_err(|error| EngineError::Embed(error.to_string()))?;
     }
 
+    writer
+        .commit()
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    Ok(())
+}
+
+pub fn delete_chunks(index: &Index, chunk_ids: &[String]) -> Result<(), EngineError> {
+    if chunk_ids.is_empty() {
+        return Ok(());
+    }
+
+    let schema = index.schema();
+    let chunk_id = schema
+        .get_field("chunk_id")
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    let mut writer = index
+        .writer::<TantivyDocument>(50_000_000)
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+
+    for id in chunk_ids {
+        writer.delete_term(Term::from_field_text(chunk_id, id));
+    }
+
+    writer
+        .commit()
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    Ok(())
+}
+
+pub fn clear(index: &Index) -> Result<(), EngineError> {
+    let mut writer = index
+        .writer::<TantivyDocument>(50_000_000)
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
+    writer
+        .delete_all_documents()
+        .map_err(|error| EngineError::Embed(error.to_string()))?;
     writer
         .commit()
         .map_err(|error| EngineError::Embed(error.to_string()))?;
@@ -98,7 +135,7 @@ pub fn search(index: &Index, query: &str, limit: usize) -> Result<Vec<FtsHit>, E
 
 #[cfg(test)]
 mod tests {
-    use super::{create_in_ram, replace_chunks, search};
+    use super::{clear, create_in_ram, delete_chunks, replace_chunks, search};
     use crate::types::Chunk;
 
     #[test]
@@ -119,5 +156,59 @@ mod tests {
 
         assert_eq!(hits[0].chunk_id, "chunk-a");
         assert!(hits[0].score > 0.0);
+    }
+
+    #[test]
+    fn deletes_old_chunk_docs_during_reindex() {
+        let index = create_in_ram();
+        let old_chunks = vec![Chunk {
+            id: "chunk-old".to_string(),
+            doc_id: "doc-1".to_string(),
+            chunk_index: 0,
+            content: "alpha legacy text".to_string(),
+            char_start: 0,
+            char_end: 17,
+            page: None,
+        }];
+        let new_chunks = vec![Chunk {
+            id: "chunk-new".to_string(),
+            doc_id: "doc-1".to_string(),
+            chunk_index: 0,
+            content: "beta current text".to_string(),
+            char_start: 0,
+            char_end: 17,
+            page: None,
+        }];
+
+        replace_chunks(&index, &old_chunks).expect("index old chunks");
+        delete_chunks(&index, &["chunk-old".to_string()]).expect("delete old chunks");
+        replace_chunks(&index, &new_chunks).expect("index new chunks");
+
+        assert!(search(&index, "alpha", 5)
+            .expect("search old term")
+            .is_empty());
+        let hits = search(&index, "beta", 5).expect("search new term");
+        assert_eq!(hits[0].chunk_id, "chunk-new");
+    }
+
+    #[test]
+    fn clear_removes_all_indexed_docs() {
+        let index = create_in_ram();
+        let chunks = vec![Chunk {
+            id: "chunk-a".to_string(),
+            doc_id: "doc-1".to_string(),
+            chunk_index: 0,
+            content: "promo printer thermal".to_string(),
+            char_start: 0,
+            char_end: 21,
+            page: None,
+        }];
+
+        replace_chunks(&index, &chunks).expect("index chunks");
+        clear(&index).expect("clear fts");
+
+        assert!(search(&index, "thermal", 5)
+            .expect("search cleared index")
+            .is_empty());
     }
 }
