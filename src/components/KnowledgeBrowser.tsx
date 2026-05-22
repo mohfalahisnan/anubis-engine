@@ -6,7 +6,6 @@ import {
   FileSpreadsheet,
   FileText,
   FileType,
-  FileVideo,
   Files,
   Loader2,
   RefreshCw,
@@ -40,7 +39,6 @@ const formatIcon: Record<string, React.ComponentType<{ className?: string }>> = 
   docx: FileCode2,
   xlsx: FileSpreadsheet,
   image: FileImage,
-  video: FileVideo,
 };
 
 export default function KnowledgeBrowser({
@@ -55,9 +53,28 @@ export default function KnowledgeBrowser({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    invoke<DocumentRow[]>("list_documents")
-      .then(setDocuments)
-      .catch(() => setDocuments([]));
+    let cancelled = false;
+    async function load() {
+      // Tolerate the engine still booting on first run — quietly retry.
+      for (let attempt = 0; attempt < 60 && !cancelled; attempt++) {
+        try {
+          const docs = await invoke<DocumentRow[]>("list_documents");
+          if (!cancelled) setDocuments(docs);
+          return;
+        } catch (reason) {
+          const message = String(reason);
+          if (!message.toLowerCase().includes("still initialising")) {
+            if (!cancelled) setDocuments([]);
+            return;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
   async function reindexDocument(document: DocumentRow) {

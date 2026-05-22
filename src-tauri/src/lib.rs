@@ -13,6 +13,9 @@ pub mod types;
 
 use tauri::Manager;
 
+use crate::engine::events;
+use crate::engine::state::{new_engine_handle, AppState};
+
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
     #[error("Database error: {0}")]
@@ -49,9 +52,34 @@ fn try_run() -> tauri::Result<()> {
             std::fs::create_dir_all(&app_data)?;
             let db_path = app_data.join("anubis.db");
             let fts_path = app_data.join("fts_index");
-            let state = engine::state::AppState::new(&db_path, &fts_path)
-                .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
-            app.manage(state);
+
+            // Register the AppHandle BEFORE spawning init so model-download
+            // events are wired up before the first download tick.
+            events::set_app_handle(app.handle().clone());
+
+            // Hand the frontend an empty handle right away so the window can
+            // paint and listen for setup events. The heavy bits (fastembed
+            // model download, OCR model download, schema migration, FTS
+            // reconcile) run on a worker thread.
+            let engine = new_engine_handle();
+            app.manage(engine.clone());
+
+            std::thread::spawn(move || {
+                events::emit_starting("engine", "Engine bootstrap");
+                match AppState::new(&db_path, &fts_path) {
+                    Ok(state) => {
+                        if engine.set(state).is_err() {
+                            tracing::warn!("engine handle already initialised");
+                        }
+                        events::emit_ready("engine", "Engine bootstrap");
+                    }
+                    Err(error) => {
+                        tracing::error!("engine init failed: {error}");
+                        events::emit_error("engine", "Engine bootstrap", error.to_string());
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -67,6 +95,7 @@ fn try_run() -> tauri::Result<()> {
             commands::query_commands::get_doc_chunks,
             commands::status_commands::get_index_stats,
             commands::status_commands::list_documents,
+            commands::status_commands::engine_ready,
         ])
         .run(tauri::generate_context!())
 }

@@ -56,6 +56,8 @@ pub struct ListToolsResult {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CallToolResult {
     pub content: Vec<ToolContent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structuredContent: Option<Value>,
     #[serde(default)]
     pub isError: bool,
 }

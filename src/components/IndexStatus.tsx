@@ -49,13 +49,43 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     try {
       const nextStats = await invoke<Stats>("get_index_stats");
       setStats(nextStats);
+      setError(null);
     } catch (reason) {
-      setError(String(reason));
+      const message = String(reason);
+      // Engine bootstrap is asynchronous — suppress the noisy banner while
+      // we wait for first-run setup (downloads, migration) to finish. The
+      // ModelDownloadBanner already shows what the app is doing.
+      if (!message.toLowerCase().includes("still initialising")) {
+        setError(message);
+      }
     }
   }
 
+  // Poll engine_ready until the backend is up, then load stats. The bootstrap
+  // window can be many seconds on first run (model downloads).
   useEffect(() => {
-    loadStats();
+    let cancelled = false;
+    async function waitForReady() {
+      while (!cancelled) {
+        try {
+          const ready = await invoke<boolean>("engine_ready");
+          if (ready) {
+            await loadStats();
+            return;
+          }
+        } catch {
+          // Command not yet registered — keep trying.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+    }
+    void waitForReady();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const unlisten = listen<Progress>("index-progress", (event) => {
       setProgress(event.payload);
       if (event.payload.status === "done") {

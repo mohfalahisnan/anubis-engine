@@ -13,6 +13,7 @@ import GraphVisualizer, {
 } from "./components/GraphVisualizer";
 import IndexStatus from "./components/IndexStatus";
 import KnowledgeBrowser, { DocumentRow } from "./components/KnowledgeBrowser";
+import ModelDownloadBanner from "./components/ModelDownloadBanner";
 import SearchBar from "./components/SearchBar";
 import { Separator } from "./components/ui/separator";
 
@@ -54,7 +55,12 @@ export default function App() {
       setSearchResults([]);
       setHasIndex(payload.nodes.length > 0);
     } catch (reason) {
-      setGraphError(String(reason));
+      const message = String(reason);
+      // First-run setup runs on a worker thread — keep the graph quiet until
+      // the engine is up rather than showing an alarming error.
+      if (!message.toLowerCase().includes("still initialising")) {
+        setGraphError(message);
+      }
     } finally {
       setGraphLoading(false);
     }
@@ -208,6 +214,7 @@ export default function App() {
 
   return (
     <div className="flex h-full min-h-screen w-full">
+      <ModelDownloadBanner />
       <aside className="flex w-[320px] shrink-0 flex-col gap-4 border-r border-[var(--color-border)] bg-[var(--color-card)]/40 p-5 backdrop-blur">
         <div className="flex items-center gap-2">
           <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-foreground)]">

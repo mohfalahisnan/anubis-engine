@@ -6,11 +6,16 @@ use uuid::Uuid;
 use crate::{entities::EntityHit, store::graph_store::GraphEdge, EngineError};
 
 /// Cap: an entity that appears in too many chunks is unhelpful for edges.
-/// (E.g. a brand name that's on every page.)
-const SHARED_ENTITY_CHUNK_CAP: i64 = 20;
-const SHARED_ENTITY_WEIGHT_KEYWORD: f32 = 0.55;
+/// (E.g. a brand name that's on every page.) Kept tight so the graph isn't
+/// dominated by `shared_entity` noise.
+const SHARED_ENTITY_CHUNK_CAP: i64 = 8;
+/// If an entity value appears in more than this fraction of all documents we
+/// treat it as a stopword and skip edge creation entirely. Catches things
+/// like the project name itself or a common org acronym.
+const SHARED_ENTITY_DOC_FRAC_CAP: f32 = 0.5;
 const SHARED_ENTITY_WEIGHT_PROPER: f32 = 0.65;
 const SHARED_ENTITY_WEIGHT_DATE: f32 = 0.6;
+const SHARED_ENTITY_WEIGHT_PHRASE: f32 = 0.7;
 
 pub fn insert_entities(conn: &Connection, hits: &[EntityHit]) -> Result<(), EngineError> {
     for hit in hits {
@@ -125,12 +130,17 @@ pub fn build_shared_entity_edges(
     conn: &Connection,
     new_doc_id: &str,
 ) -> Result<Vec<GraphEdge>, EngineError> {
+    // KEYWORD entities (top-N most frequent tokens per chunk) are far too
+    // common to make for useful cross-doc edges — they explode the graph with
+    // weak signal. Restrict edges to PROPER, DATE, and PHRASE, where shared
+    // occurrence actually implies topical overlap.
     let mut new_stmt = conn.prepare(
         r#"
         SELECT e.chunk_id, e.entity_type, COALESCE(e.normalized_value, e.value)
         FROM entities e
         JOIN chunks c ON c.id = e.chunk_id
         WHERE c.doc_id = ?1
+          AND e.entity_type IN ('PROPER', 'DATE', 'PHRASE')
         "#,
     )?;
     let new_rows: Vec<(String, String, String)> = new_stmt
@@ -138,6 +148,19 @@ pub fn build_shared_entity_edges(
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })?
         .collect::<Result<Vec<_>, _>>()?;
+
+    let total_docs: i64 =
+        conn.query_row("SELECT COUNT(*) FROM documents", [], |row| row.get(0))?;
+    let doc_frac_cap = ((total_docs as f32) * SHARED_ENTITY_DOC_FRAC_CAP).ceil() as i64;
+
+    let mut doc_freq_stmt = conn.prepare(
+        r#"
+        SELECT COUNT(DISTINCT c.doc_id)
+        FROM entities e
+        JOIN chunks c ON c.id = e.chunk_id
+        WHERE e.entity_type = ?1 AND COALESCE(e.normalized_value, e.value) = ?2
+        "#,
+    )?;
 
     let mut matched_stmt = conn.prepare(
         r#"
@@ -151,10 +174,22 @@ pub fn build_shared_entity_edges(
 
     let mut edges = Vec::new();
     for (new_chunk_id, entity_type, value) in &new_rows {
+        // Stopword guard: if this value already shows up in too many docs, it
+        // isn't discriminative — skip edge creation.
+        if total_docs > 4 {
+            let doc_freq: i64 = doc_freq_stmt
+                .query_row(params![entity_type, value], |row| row.get(0))
+                .unwrap_or(0);
+            if doc_freq > doc_frac_cap {
+                continue;
+            }
+        }
+
         let weight = match entity_type.as_str() {
             "DATE" => SHARED_ENTITY_WEIGHT_DATE,
             "PROPER" => SHARED_ENTITY_WEIGHT_PROPER,
-            _ => SHARED_ENTITY_WEIGHT_KEYWORD,
+            "PHRASE" => SHARED_ENTITY_WEIGHT_PHRASE,
+            _ => continue,
         };
         let matches: Vec<String> = matched_stmt
             .query_map(

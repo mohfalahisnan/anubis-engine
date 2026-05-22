@@ -4,7 +4,12 @@ use crate::EngineError;
 
 pub const EMBEDDING_DIM: usize = 384;
 
-pub fn embed_batch(
+/// E5 family was trained with two distinct task prefixes. Skipping these
+/// silently degrades recall by ~5-15 percentage points.
+const PASSAGE_PREFIX: &str = "passage: ";
+const QUERY_PREFIX: &str = "query: ";
+
+fn embed_raw(
     model: &mut TextEmbedding,
     texts: &[String],
 ) -> Result<Vec<Vec<f32>>, EngineError> {
@@ -13,8 +18,22 @@ pub fn embed_batch(
         .map_err(|error| EngineError::Embed(error.to_string()))
 }
 
+/// Embed a batch of document chunks (passages) — applies the E5 `passage:` prefix.
+pub fn embed_batch(
+    model: &mut TextEmbedding,
+    texts: &[String],
+) -> Result<Vec<Vec<f32>>, EngineError> {
+    let prefixed: Vec<String> = texts
+        .iter()
+        .map(|text| format!("{PASSAGE_PREFIX}{text}"))
+        .collect();
+    embed_raw(model, &prefixed)
+}
+
+/// Embed a user query — applies the E5 `query:` prefix.
 pub fn embed_query(model: &mut TextEmbedding, text: &str) -> Result<Vec<f32>, EngineError> {
-    let embeddings = embed_batch(model, &[text.to_string()])?;
+    let prefixed = format!("{QUERY_PREFIX}{text}");
+    let embeddings = embed_raw(model, &[prefixed])?;
     embeddings
         .into_iter()
         .next()

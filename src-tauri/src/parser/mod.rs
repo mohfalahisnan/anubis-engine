@@ -1,8 +1,4 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    path::Path,
-};
+use std::path::Path;
 
 use crate::{
     types::{DocFormat, DocMetadata},
@@ -13,7 +9,6 @@ pub mod docx;
 pub mod image;
 pub mod markdown;
 pub mod pdf;
-pub mod video;
 pub mod xlsx;
 
 pub fn parse(path: &Path) -> Result<crate::types::ParsedDoc, EngineError> {
@@ -23,7 +18,6 @@ pub fn parse(path: &Path) -> Result<crate::types::ParsedDoc, EngineError> {
         DocFormat::Docx => docx::parse(path),
         DocFormat::Xlsx => xlsx::parse(path),
         DocFormat::Image => image::parse(path),
-        DocFormat::Video => video::parse(path),
     }
 }
 
@@ -40,7 +34,6 @@ pub fn format_from_path(path: &Path) -> DocFormat {
         Some("docx") => DocFormat::Docx,
         Some("xlsx") => DocFormat::Xlsx,
         Some("png" | "jpg" | "jpeg" | "webp" | "tiff") => DocFormat::Image,
-        Some("mp4" | "mov" | "avi") => DocFormat::Video,
         _ => DocFormat::Text,
     }
 }
@@ -56,13 +49,10 @@ pub fn metadata_for_path(path: &Path) -> Result<DocMetadata, EngineError> {
     Ok(DocMetadata {
         filename,
         size_bytes: bytes.len() as u64,
-        hash: pseudo_blake3_hex(&bytes),
+        hash: blake3_hex(&bytes),
     })
 }
 
-pub fn pseudo_blake3_hex(bytes: &[u8]) -> String {
-    // TODO(v2): replace with real blake3 once the crate is added to the approved dependency list.
-    let mut hasher = DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
+pub fn blake3_hex(bytes: &[u8]) -> String {
+    blake3::hash(bytes).to_hex().to_string()
 }

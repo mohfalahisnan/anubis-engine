@@ -6,36 +6,31 @@ pub const DEFAULT_WINDOW_SIZE: usize = 512;
 pub const DEFAULT_OVERLAP: usize = 64;
 pub const DEFAULT_MIN_CHUNK: usize = 50;
 
+/// Chunk a document page-by-page so a chunk never spans a hard structural
+/// boundary (PDF page break, Markdown heading section). Char offsets are
+/// expressed relative to the page's local text — that matches how the
+/// retrieval UI displays them and avoids a brittle global-offset bookkeeping.
 pub fn chunk_document(doc: &ParsedDoc) -> Vec<Chunk> {
-    let mut full_text = String::new();
-    let mut page_offsets = Vec::new();
+    let mut all_chunks = Vec::new();
+    let mut chunk_counter = 0usize;
 
     for page in &doc.pages {
-        let start = full_text.chars().count();
-        if !full_text.is_empty() {
-            full_text.push('\n');
+        let page_chunks = chunk_text(
+            &page.text,
+            &doc.doc_id,
+            DEFAULT_WINDOW_SIZE,
+            DEFAULT_OVERLAP,
+            DEFAULT_MIN_CHUNK,
+        );
+        for mut chunk in page_chunks {
+            chunk.chunk_index = chunk_counter;
+            chunk.page = page.page_num;
+            chunk_counter += 1;
+            all_chunks.push(chunk);
         }
-        full_text.push_str(&page.text);
-        let end = full_text.chars().count();
-        page_offsets.push((start, end, page.page_num));
     }
 
-    let mut chunks = chunk_text(
-        &full_text,
-        &doc.doc_id,
-        DEFAULT_WINDOW_SIZE,
-        DEFAULT_OVERLAP,
-        DEFAULT_MIN_CHUNK,
-    );
-
-    for chunk in &mut chunks {
-        chunk.page = page_offsets
-            .iter()
-            .find(|(start, end, _)| chunk.char_start >= *start && chunk.char_start < *end)
-            .and_then(|(_, _, page)| *page);
-    }
-
-    chunks
+    all_chunks
 }
 
 pub fn chunk_text(

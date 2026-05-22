@@ -8,15 +8,35 @@ use tokio::runtime::Runtime;
 use crate::engine::state::AppState;
 use protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError, InitializeResult, ServerInfo};
 
-fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
+fn get_db_path() -> Result<std::path::PathBuf, String> {
+    if let Some(path) = std::env::var_os("ANUBIS_DB_PATH") {
+        return Ok(std::path::PathBuf::from(path));
+    }
+    Ok(default_app_data_dir()?.join("anubis.db"))
+}
+
+fn get_fts_path(db_path: &std::path::Path) -> std::path::PathBuf {
+    if let Some(path) = std::env::var_os("ANUBIS_FTS_PATH") {
+        return std::path::PathBuf::from(path);
+    }
+    db_path
+        .parent()
+        .map(|parent| parent.join("fts_index"))
+        .unwrap_or_else(|| std::path::PathBuf::from("fts_index"))
+}
+
+fn default_app_data_dir() -> Result<std::path::PathBuf, String> {
     #[cfg(target_os = "windows")]
     {
-        let local_app_data = std::env::var("LOCALAPPDATA").map_err(|_| "LOCALAPPDATA not found".to_string())?;
-        Ok(std::path::PathBuf::from(local_app_data).join("com.anubis-os.app"))
+        // Tauri's app_data_dir on Windows uses ROAMING (%APPDATA%), not LOCAL.
+        // The MCP server must match so it sees the same database the UI writes to.
+        let appdata = std::env::var("APPDATA")
+            .map_err(|_| "APPDATA not set".to_string())?;
+        Ok(std::path::PathBuf::from(appdata).join("com.anubis-os.app"))
     }
     #[cfg(target_os = "macos")]
     {
-        let home = std::env::var("HOME").map_err(|_| "HOME not found".to_string())?;
+        let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
         Ok(std::path::PathBuf::from(home).join("Library/Application Support/com.anubis-os.app"))
     }
     #[cfg(target_os = "linux")]
@@ -37,12 +57,12 @@ pub fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
-    let app_data = get_app_data_dir()?;
-        
-    std::fs::create_dir_all(&app_data)?;
-    let db_path = app_data.join("anubis.db");
-    let fts_path = app_data.join("fts_index");
-    
+    let db_path = get_db_path()?;
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let fts_path = get_fts_path(&db_path);
+
     let state = AppState::new(&db_path, &fts_path)
         .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
     
@@ -101,15 +121,15 @@ async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpc
                 jsonrpc: "2.0".to_string(),
                 id,
                 result: Some(json!(InitializeResult {
-                    protocolVersion: "2024-11-05".to_string(),
+                    protocolVersion: "2025-06-18".to_string(),
                     capabilities: json!({
                         "tools": {
                             "listChanged": false
                         }
                     }),
                     serverInfo: ServerInfo {
-                        name: "anubis-engine-mcp".to_string(),
-                        version: "0.1.0".to_string(),
+                        name: "anubis-engine".to_string(),
+                        version: env!("CARGO_PKG_VERSION").to_string(),
                     }
                 })),
                 error: None,
@@ -119,6 +139,12 @@ async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpc
             // Nothing to reply for notifications
             None
         }
+        "ping" => Some(JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: Some(json!({})),
+            error: None,
+        }),
         "tools/list" => {
             let tools = tools::list_tools();
             Some(JsonRpcResponse {

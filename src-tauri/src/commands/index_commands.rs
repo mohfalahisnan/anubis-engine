@@ -1,30 +1,37 @@
 use tauri::{AppHandle, State};
 
-use crate::engine::state::AppState;
+use crate::commands::engine_or_error;
+use crate::engine::state::EngineHandle;
 use crate::store::{chunks, db, fts};
 
 #[tauri::command]
 pub async fn index_folder(
     path: String,
-    state: State<'_, AppState>,
+    state: State<'_, EngineHandle>,
     app: AppHandle,
 ) -> Result<(), String> {
-    crate::engine::indexer::index_folder(&path, state.inner(), Some(app))
+    let engine = engine_or_error(&state)?;
+    crate::engine::indexer::index_folder(&path, engine, Some(app))
         .await
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub async fn index_file(path: String, state: State<'_, AppState>) -> Result<(), String> {
-    crate::engine::indexer::index_file(&path, state.inner())
+pub async fn index_file(path: String, state: State<'_, EngineHandle>) -> Result<(), String> {
+    let engine = engine_or_error(&state)?;
+    crate::engine::indexer::index_file(&path, engine)
         .await
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub async fn remove_document(doc_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn remove_document(
+    doc_id: String,
+    state: State<'_, EngineHandle>,
+) -> Result<(), String> {
+    let engine = engine_or_error(&state)?;
     let chunk_ids = {
-        let db = state.db.lock().await;
+        let db = engine.db.lock().await;
         chunks::get_doc_chunks(&db, &doc_id)
             .map_err(|error| error.to_string())?
             .into_iter()
@@ -33,25 +40,26 @@ pub async fn remove_document(doc_id: String, state: State<'_, AppState>) -> Resu
     };
 
     {
-        let fts = state.fts.lock().await;
+        let fts = engine.fts.lock().await;
         fts::delete_chunks(&fts, &chunk_ids).map_err(|error| error.to_string())?;
     }
 
     {
-        let db = state.db.lock().await;
+        let db = engine.db.lock().await;
         db::delete_document(&db, &doc_id).map_err(|error| error.to_string())
     }
 }
 
 #[tauri::command]
-pub async fn reset_index(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn reset_index(state: State<'_, EngineHandle>) -> Result<(), String> {
+    let engine = engine_or_error(&state)?;
     {
-        let fts = state.fts.lock().await;
+        let fts = engine.fts.lock().await;
         fts::clear(&fts).map_err(|error| error.to_string())?;
     }
 
     {
-        let db = state.db.lock().await;
+        let db = engine.db.lock().await;
         db::reset_index(&db).map_err(|error| error.to_string())
     }
 }

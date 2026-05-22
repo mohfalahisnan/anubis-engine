@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__anubis-engine__anubis_list_documents",
+      "Bash(git show *)",
+      "Bash(git diff *)",
+      "Read(//tmp/**)"
+    ]
+  }
+}
