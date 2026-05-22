@@ -281,6 +281,18 @@ fn is_supported(path: &Path) -> bool {
                 | "jpeg"
                 | "webp"
                 | "tiff"
+                | "mp4"
+                | "mov"
+                | "avi"
+                | "mkv"
+                | "webm"
+                | "wmv"
+                | "mp3"
+                | "wav"
+                | "m4a"
+                | "flac"
+                | "ogg"
+                | "opus"
         )
     )
 }

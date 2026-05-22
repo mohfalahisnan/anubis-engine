@@ -5,10 +5,12 @@ use crate::{
     EngineError,
 };
 
+pub mod audio;
 pub mod docx;
 pub mod image;
 pub mod markdown;
 pub mod pdf;
+pub mod video;
 pub mod xlsx;
 
 pub fn parse(path: &Path) -> Result<crate::types::ParsedDoc, EngineError> {
@@ -18,6 +20,8 @@ pub fn parse(path: &Path) -> Result<crate::types::ParsedDoc, EngineError> {
         DocFormat::Docx => docx::parse(path),
         DocFormat::Xlsx => xlsx::parse(path),
         DocFormat::Image => image::parse(path),
+        DocFormat::Video => video::parse(path),
+        DocFormat::Audio => audio::parse(path),
     }
 }
 
@@ -34,6 +38,8 @@ pub fn format_from_path(path: &Path) -> DocFormat {
         Some("docx") => DocFormat::Docx,
         Some("xlsx") => DocFormat::Xlsx,
         Some("png" | "jpg" | "jpeg" | "webp" | "tiff") => DocFormat::Image,
+        Some("mp4" | "mov" | "avi" | "mkv" | "webm" | "wmv") => DocFormat::Video,
+        Some("mp3" | "wav" | "m4a" | "flac" | "ogg" | "opus") => DocFormat::Audio,
         _ => DocFormat::Text,
     }
 }

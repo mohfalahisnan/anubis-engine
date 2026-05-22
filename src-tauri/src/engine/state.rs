@@ -35,6 +35,7 @@ impl AppState {
         if let Some(parent) = db_path.parent() {
             crate::ocr::engine::set_models_dir(parent.to_path_buf());
             embedder::download::set_models_dir(parent.to_path_buf());
+            crate::transcription::engine::set_models_dir(parent.to_path_buf());
         }
 
         let db = store::db::open(db_path)?;

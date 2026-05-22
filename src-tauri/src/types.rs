@@ -24,6 +24,8 @@ pub enum DocFormat {
     Docx,
     Xlsx,
     Image,
+    Video,
+    Audio,
     Text,
 }
 
@@ -35,6 +37,8 @@ impl DocFormat {
             Self::Docx => "docx",
             Self::Xlsx => "xlsx",
             Self::Image => "image",
+            Self::Video => "video",
+            Self::Audio => "audio",
             Self::Text => "text",
         }
     }
@@ -46,6 +50,8 @@ impl DocFormat {
             "docx" => Self::Docx,
             "xlsx" => Self::Xlsx,
             "image" => Self::Image,
+            "video" => Self::Video,
+            "audio" => Self::Audio,
             _ => Self::Text,
         }
     }

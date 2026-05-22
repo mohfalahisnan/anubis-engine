@@ -1,11 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import {
+  FileAudio,
   FileCode2,
   FileImage,
   FileSpreadsheet,
   FileText,
   FileType,
+  FileVideo,
   Files,
   Loader2,
   RefreshCw,
@@ -39,6 +41,8 @@ const formatIcon: Record<string, React.ComponentType<{ className?: string }>> = 
   docx: FileCode2,
   xlsx: FileSpreadsheet,
   image: FileImage,
+  video: FileVideo,
+  audio: FileAudio,
 };
 
 export default function KnowledgeBrowser({

@@ -43,6 +43,13 @@ chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5"
 notify = "8.0"
 anyhow = "1.0"
+ffmpeg-sidecar = "2"
+# Note: we intentionally invoke whisper.cpp as a subprocess (binary
+# auto-downloaded at runtime) instead of using whisper-rs. The latter pulls
+# in `bindgen` which needs libclang on the build host — a hard install for
+# users on a fresh Windows machine. The subprocess path keeps the build
+# dependency surface flat.
+zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 tauri-build = { version = "2.6", features = [] }

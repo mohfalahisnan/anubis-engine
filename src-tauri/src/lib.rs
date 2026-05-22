@@ -9,6 +9,7 @@ pub mod ocr;
 pub mod parser;
 pub mod query;
 pub mod store;
+pub mod transcription;
 pub mod types;
 
 use tauri::Manager;
@@ -26,6 +27,8 @@ pub enum EngineError {
     Embed(String),
     #[error("OCR error: {0}")]
     Ocr(String),
+    #[error("Transcription error: {0}")]
+    Transcribe(String),
     #[error("Index already running")]
     AlreadyIndexing,
     #[error("IO error: {0}")]
