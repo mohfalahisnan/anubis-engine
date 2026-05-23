@@ -15,7 +15,7 @@ pub mod types;
 use tauri::Manager;
 
 use crate::engine::events;
-use crate::engine::state::{new_engine_handle, AppState};
+use crate::engine::state::new_engine_handle;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EngineError {
@@ -60,8 +60,8 @@ fn try_run() -> tauri::Result<()> {
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data)?;
-            let db_path = app_data.join("anubis.db");
-            let fts_path = app_data.join("fts_index");
+            let workdirs_root = app_data.join("workdirs");
+            std::fs::create_dir_all(&workdirs_root)?;
 
             // Register the AppHandle BEFORE spawning init so model-download
             // events are wired up before the first download tick.
@@ -69,8 +69,8 @@ fn try_run() -> tauri::Result<()> {
 
             // Hand the frontend an empty handle right away so the window can
             // paint and listen for setup events. The heavy bits (fastembed
-            // model download, OCR model download, schema migration, FTS
-            // reconcile) run on a worker thread.
+            // model download) run on a worker thread; per-workdir AppStates
+            // are then constructed lazily on first use.
             let engine = new_engine_handle();
             app.manage(engine.clone());
 
@@ -85,18 +85,13 @@ fn try_run() -> tauri::Result<()> {
                         return;
                     }
                 };
-                match AppState::new(&db_path, &fts_path, embedder) {
-                    Ok(state) => {
-                        if engine.set(state).is_err() {
-                            tracing::warn!("engine handle already initialised");
-                        }
-                        events::emit_ready("engine", "Engine bootstrap");
-                    }
-                    Err(error) => {
-                        tracing::error!("engine init failed: {error}");
-                        events::emit_error("engine", "Engine bootstrap", error.to_string());
-                    }
+                let registry = std::sync::Arc::new(
+                    crate::engine::registry::WorkdirRegistry::new(workdirs_root, embedder),
+                );
+                if engine.set(registry).is_err() {
+                    tracing::warn!("engine handle already initialised");
                 }
+                events::emit_ready("engine", "Engine bootstrap");
             });
 
             Ok(())

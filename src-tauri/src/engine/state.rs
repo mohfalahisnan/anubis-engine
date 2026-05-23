@@ -3,14 +3,13 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+use crate::engine::registry::WorkdirRegistry;
 use crate::{store, EngineError};
 
-/// Shared handle to the engine. `None` while first-run initialisation is
-/// still in progress (model downloads, schema migration, FTS reconcile).
-/// Wrapped in [`tokio::sync::OnceCell`] so commands can `.get()` it without
-/// blocking — they return a friendly "still initialising" error when the
-/// engine isn't ready.
-pub type EngineHandle = Arc<tokio::sync::OnceCell<AppState>>;
+/// Shared handle to the workdir registry. `None` while first-run setup is
+/// still in progress (embedder download). Once set, commands resolve a
+/// per-workdir [`AppState`] via `registry.get_or_load(workdir)`.
+pub type EngineHandle = Arc<tokio::sync::OnceCell<Arc<WorkdirRegistry>>>;
 
 pub fn new_engine_handle() -> EngineHandle {
     Arc::new(tokio::sync::OnceCell::new())

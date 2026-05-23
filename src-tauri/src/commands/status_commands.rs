@@ -2,40 +2,39 @@ use serde_json::json;
 use tauri::State;
 
 use crate::{
-    commands::engine_or_error,
+    commands::{registry_or_error, workdir_state},
     engine::{settings as engine_settings, state::EngineHandle},
     store::db,
 };
 
 #[tauri::command]
-pub async fn get_index_stats(state: State<'_, EngineHandle>) -> Result<serde_json::Value, String> {
-    let engine = engine_or_error(&state)?;
+pub async fn get_index_stats(
+    workdir: String,
+    state: State<'_, EngineHandle>,
+) -> Result<serde_json::Value, String> {
+    let (_workdir_id, engine) = workdir_state(&state, &workdir).await?;
     let db = engine.db.lock().await;
     db::get_index_stats(&db).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn list_documents(
+    workdir: String,
     state: State<'_, EngineHandle>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let engine = engine_or_error(&state)?;
+    let (_workdir_id, engine) = workdir_state(&state, &workdir).await?;
     let db = engine.db.lock().await;
     db::list_documents(&db).map_err(|error| error.to_string())
 }
 
-/// Whether the engine has finished its (possibly slow) first-run setup —
-/// model downloads, DB migration, FTS reconcile. Frontend polls this after
-/// the splash screen disappears or uses the `model-download` events to know
-/// the same thing.
+/// Whether the engine has finished its first-run setup (embedder download
+/// + registry construction). Workdir-agnostic — the registry is built once
+/// per process; individual workdirs are loaded lazily on first use.
 #[tauri::command]
 pub async fn engine_ready(state: State<'_, EngineHandle>) -> Result<bool, String> {
-    Ok(state.get().is_some())
+    Ok(registry_or_error(&state).is_ok())
 }
 
-/// Returns the user-tunable runtime settings the UI exposes. Today that's
-/// just the transcription toggle, but the shape leaves room for more
-/// switches (per-source crawl options, OCR enable/disable, etc.) without
-/// having to add a new command for each one.
 #[tauri::command]
 pub async fn get_settings(_state: State<'_, EngineHandle>) -> Result<serde_json::Value, String> {
     Ok(json!({
@@ -43,14 +42,25 @@ pub async fn get_settings(_state: State<'_, EngineHandle>) -> Result<serde_json:
     }))
 }
 
+/// Toggle transcription. Persisted into every currently-loaded workdir's
+/// DB (the setting is a process-global, not per-workdir, switch — we mirror
+/// it to every DB so a future reload picks it up regardless of which workdir
+/// is opened first). Also updates the in-memory flag immediately.
 #[tauri::command]
 pub async fn set_transcription_enabled(
     enabled: bool,
     state: State<'_, EngineHandle>,
 ) -> Result<bool, String> {
-    let engine = engine_or_error(&state)?;
-    let db = engine.db.lock().await;
-    engine_settings::persist(&db, enabled).map_err(|error| error.to_string())?;
+    let registry = registry_or_error(&state)?;
+    engine_settings::set_transcription_enabled(enabled);
+    let loaded = {
+        let states = registry.loaded_states().await;
+        states.values().cloned().collect::<Vec<_>>()
+    };
+    for engine in loaded {
+        let db = engine.db.lock().await;
+        engine_settings::persist(&db, enabled).map_err(|error| error.to_string())?;
+    }
     Ok(enabled)
 }
 
