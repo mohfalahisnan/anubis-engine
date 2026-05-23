@@ -111,10 +111,15 @@ function baselineToDecisionMetrics(baseline) {
     p95LatencyMs: Number(baseline.queryLatency?.p95Ms || 0),
     criticalFailures: Number(baseline.retrieval?.criticalFailures || 0),
     permissionLeakage: Number(baseline.security?.permissionLeakage || 0),
+    edgeEvidenceCoverage: Number(baseline.graph?.edgeEvidenceCoverage ?? 0),
+    visibleEdgesPerNode: Number.isFinite(baseline.graph?.visibleEdgesPerNode)
+      ? Number(baseline.graph.visibleEdgesPerNode)
+      : null,
   };
 }
 
 function summaryToDecisionMetrics(summary) {
+  const graphMetrics = summary.graphMetrics || {};
   return {
     aqi: Number(summary.aqi || 0),
     recallAt10: Number(summary.averageRecallAt10 ?? summary.averageRecallAt5 ?? 0),
@@ -122,6 +127,10 @@ function summaryToDecisionMetrics(summary) {
     p95LatencyMs: Number(summary.queryLatency?.p95Ms || 0),
     criticalFailures: Number(summary.criticalFailures || 0),
     permissionLeakage: Number(summary.permissionLeakage || 0),
+    edgeEvidenceCoverage: Number(graphMetrics.edgeEvidenceCoverage ?? 0),
+    visibleEdgesPerNode: Number.isFinite(graphMetrics.visibleEdgesPerNode)
+      ? Number(graphMetrics.visibleEdgesPerNode)
+      : null,
   };
 }
 
@@ -184,6 +193,8 @@ Decision: ${decision}
 - p95 latency: ${before.p95LatencyMs} ms
 - Critical failures: ${before.criticalFailures}
 - Permission leakage: ${before.permissionLeakage}
+- Edge evidence coverage: ${before.edgeEvidenceCoverage}
+- Visible edges/node: ${before.visibleEdgesPerNode}
 
 ## After
 
@@ -194,6 +205,8 @@ Decision: ${decision}
 - p95 latency: ${after.p95LatencyMs} ms
 - Critical failures: ${after.criticalFailures}
 - Permission leakage: ${after.permissionLeakage}
+- Edge evidence coverage: ${after.edgeEvidenceCoverage}
+- Visible edges/node: ${after.visibleEdgesPerNode}
 
 ## Production Checks
 

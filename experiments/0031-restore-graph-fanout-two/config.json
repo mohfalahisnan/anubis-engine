@@ -1,0 +1,21 @@
+{
+  "id": "0031-restore-graph-fanout-two",
+  "suite": "quick",
+  "baseline": "current-alpha-2026-05-23-0027-graph-fanout-two",
+  "debug": {
+    "includeScoreBreakdown": true,
+    "includeTopResults": 10,
+    "includeCriticalFailureDiagnostics": true,
+    "includeDiagnosticCandidates": 50,
+    "includeIndexingPhaseTiming": true,
+    "includeGraphMetrics": true,
+    "aliases": {
+      "invoice approval": [
+        "dock payment evidence",
+        "VID-APPROVAL-005",
+        "invoice approval"
+      ]
+    }
+  },
+  "behaviorChange": true
+}

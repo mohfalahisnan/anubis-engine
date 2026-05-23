@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0045-candidate-pool-10",
+  "aqi": 77.8,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 566,
+  "edges": 53145,
+  "edgesPerChunk": 93.9,
+  "indexPassTimeSec": 32.84,
+  "throughputFilesPerSec": 1.6,
+  "throughputKbPerSec": 3.3,
+  "queryLatency": {
+    "averageMs": 244,
+    "p50Ms": 240,
+    "p95Ms": 331,
+    "p99Ms": 331
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.97,
+    "averagePrecisionAtK": 0.25,
+    "recallAt10": 1,
+    "precisionAt10": 0.59,
+    "top3Accuracy": 1,
+    "mrrAt10": 1,
+    "ndcgAt10": 0.98,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 93.9,
+    "visibleEdges": 1779,
+    "visibleEdgesPerNode": 3.14,
+    "candidateEdges": 53145
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

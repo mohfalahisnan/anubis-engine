@@ -1,0 +1,22 @@
+{
+  "id": "0039-manifest-overlap-expansion",
+  "suite": "quick",
+  "baseline": "current-alpha-2026-05-23-0036-trusted-graph-metrics",
+  "debug": {
+    "includeScoreBreakdown": true,
+    "includeTopResults": 10,
+    "includeCriticalFailureDiagnostics": true,
+    "includePrecisionDiagnostics": true,
+    "includeDiagnosticCandidates": 50,
+    "includeIndexingPhaseTiming": true,
+    "includeGraphMetrics": true,
+    "aliases": {
+      "invoice approval": [
+        "dock payment evidence",
+        "VID-APPROVAL-005",
+        "invoice approval"
+      ]
+    }
+  },
+  "behaviorChange": true
+}

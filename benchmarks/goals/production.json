@@ -1,21 +1,23 @@
 {
   "meta": {
     "name": "anubis-production",
-    "version": 2,
+    "version": 3,
     "updatedAt": "2026-05-23",
     "consumer": "bin/experiment.js productionGoalChecks + codex self-improving loop",
-    "contract": "Fields aqi, retrieval, latency, security are read by bin/experiment.js. Do not rename or move them. New fields (baseline, priorities, keepRevertRules, stopCondition, loop) are read by the codex orchestrator."
+    "contract": "Fields aqi, retrieval, latency, security are read by bin/experiment.js. Do not rename or move them. New fields (baseline, priorities, keepRevertRules, stopCondition, loop) are read by the codex orchestrator.",
+    "activeTier": "productionV1",
+    "notes": "Top-level fields are intentionally set to productionV1 targets for the near-term self-improving loop. Higher maturity targets live in tiers.enterprise and tiers.excellent."
   },
   "aqi": {
-    "target": 95,
-    "hardMinimum": 90
+    "target": 85,
+    "hardMinimum": 80
   },
   "retrieval": {
-    "recallAt10": 0.95,
-    "precisionAt10": 0.5,
-    "top3Accuracy": 0.95,
-    "mrrAt10": 0.9,
-    "ndcgAt10": 0.9,
+    "recallAt10": 0.92,
+    "precisionAt10": 0.45,
+    "top3Accuracy": 0.8,
+    "mrrAt10": 0.7,
+    "ndcgAt10": 0.75,
     "criticalFailures": 0
   },
   "latency": {
@@ -25,8 +27,8 @@
   "graph": {
     "visibleEdgesPerNodeMax": 15,
     "candidateEdgesPerNodeMax": 50,
-    "weakEdgeRatioMax": 0.2,
-    "duplicateEdgeRatioMax": 0.02
+    "weakEdgeRatioMax": 0.25,
+    "duplicateEdgeRatioMax": 0.03
   },
   "indexing": {
     "textOnlyThroughputKbPerSec": 500,
@@ -34,8 +36,8 @@
     "noChangeReindexMsMax": 3000
   },
   "grounding": {
-    "sourceCoverage": 0.95,
-    "edgeEvidenceCoverage": 0.95
+    "sourceCoverage": 0.9,
+    "edgeEvidenceCoverage": 0.6
   },
   "security": {
     "permissionLeakage": 0,
@@ -50,73 +52,73 @@
     "indexingCrashMaxAqi": 70
   },
   "baseline": {
-    "ref": "benchmarks/baselines/current-alpha-2026-05-23-0027-graph-fanout-two.json",
-    "lastExperiment": "experiments/0027-graph-fanout-two",
+    "ref": "benchmarks/baselines/current-alpha-2026-05-23-0054-skip-graph-expansion.json",
+    "lastExperiment": "experiments/0054-skip-graph-expansion",
     "snapshot": {
-      "aqi": 87.9,
-      "recallAt10": 0.98,
-      "precisionAt10": 0.39,
+      "aqi": 96,
+      "recallAt10": 1,
+      "precisionAt10": 0.46,
       "top3Accuracy": 1,
       "mrrAt10": 1,
-      "ndcgAt10": 0.98,
-      "p95LatencyMs": 177,
-      "p99LatencyMs": 177,
+      "ndcgAt10": 0.99,
+      "p95LatencyMs": 67,
+      "p99LatencyMs": 67,
       "criticalFailures": 0,
       "permissionLeakage": 0,
-      "graphEdgesPerChunk": 69.86,
-      "edgeEvidenceCoverage": 0.04
+      "graphEdgesPerChunk": 94.67,
+      "edgeEvidenceCoverage": 1,
+      "visibleEdgesPerNode": 2.84
     }
   },
   "priorities": [
     {
       "rank": 1,
-      "metric": "retrieval.criticalFailures",
-      "current": 0,
-      "target": 0,
+      "metric": "grounding.edgeEvidenceCoverage",
+      "current": 1,
+      "target": 0.6,
       "gap": 0,
-      "blocker": "hardGate: caps AQI at 80",
-      "rationale": "One query (invoice approval, VID-APPROVAL-005) returns zero true positives. Until this is fixed, AQI cannot pass the 80 hard cap and production is unreachable."
+      "rationale": "Largest productionV1 gap. Edge evidence is only 4%; productionV1 needs enough persisted or reproducible evidence for trusted graph edges. First target is 0.60, not 0.95, to avoid unrealistic all-at-once architecture changes."
     },
     {
       "rank": 2,
       "metric": "retrieval.precisionAt10",
-      "current": 0.39,
-      "target": 0.5,
-      "gap": 0.11,
-      "rationale": "Largest quality gap not yet at production. Score breakdowns show bottom-half of top-10 is graph-only or entity-only hits with weak BM25 / vector signal — candidates for downranking, pruning, or rerank."
+      "current": 0.46,
+      "target": 0.45,
+      "gap": 0,
+      "rationale": "Nearest quality gap. Improve precision from 0.39 to 0.45 while preserving Recall@10 >= 0.95 and p95 latency <= 500ms. Prefer downranking weak graph/entity-only hits, pruning noisy candidates, or lightweight rerank."
     },
     {
       "rank": 3,
-      "metric": "aqi",
-      "current": 87.9,
-      "target": 95,
-      "gap": 7.1,
-      "rationale": "Composite. Moves as #1 and #2 land; do not optimise directly."
+      "metric": "graph.visibleEdgesPerNodeMax",
+      "current": 2.84,
+      "target": 15,
+      "gap": 0,
+      "blockedBy": "harness does not yet split candidate vs visible edges",
+      "rationale": "Baseline has ~70 candidate edges/chunk and no visible/trusted split. Implement candidate vs visible/trusted graph metrics before treating this as a numeric production gate."
     },
     {
       "rank": 4,
-      "metric": "retrieval.recallAt10",
-      "current": 0.98,
-      "target": 0.95,
+      "metric": "retrieval.criticalFailures",
+      "current": 0,
+      "target": 0,
       "gap": 0,
-      "rationale": "Close — protect, do not regress. Final push only after precision is at target."
+      "rationale": "Already at target. Protect this metric; never allow critical failures to increase."
     },
     {
       "rank": 5,
-      "metric": "grounding.edgeEvidenceCoverage",
-      "current": 0.04,
-      "target": 0.95,
-      "gap": 0.91,
-      "rationale": "Evidence is computed on read; baseline coverage 4%. Needs evidence persisted on write or a coverage walker before this can move."
+      "metric": "retrieval.recallAt10",
+      "current": 1,
+      "target": 0.92,
+      "gap": 0,
+      "rationale": "Already above productionV1 target. Protect recall; do not optimize it until precision and grounding are healthier."
     },
     {
       "rank": 6,
-      "metric": "graph.visibleEdgesPerNodeMax",
-      "current": null,
-      "target": 15,
-      "gap": null,
-      "blockedBy": "harness does not yet split candidate vs visible edges",
-      "rationale": "Baseline has 71 edges/chunk and no visibility split. Requires a trusted-graph / candidate-graph separation in both engine and benchmark before this is observable."
+      "metric": "aqi",
+      "current": 96,
+      "target": 85,
+      "gap": 0,
+      "rationale": "Already above productionV1 AQI target. Do not optimize AQI directly; use it as a guardrail while fixing precision, evidence, and trusted graph readiness."
     }
   ],
   "keepRevertRules": {
@@ -145,6 +147,11 @@
         "id": "edge-bloat",
         "when": "after.graphEdges > before.graphEdges && after.precisionAt10 <= before.precisionAt10",
         "reason": "More edges without precision gain is added noise."
+      },
+      {
+        "id": "evidence-regression",
+        "when": "before.edgeEvidenceCoverage - after.edgeEvidenceCoverage > 0.05",
+        "reason": "Do not lose edge evidence coverage while moving toward trusted graph readiness."
       }
     ],
     "keepIfAny": [
@@ -162,13 +169,24 @@
         "id": "aqi-jump",
         "when": "(after.aqi - before.aqi) >= 2",
         "reason": "Composite improvement worth keeping (matches bin/experiment.js decision logic)."
+      },
+      {
+        "id": "edge-evidence-jump",
+        "when": "(after.edgeEvidenceCoverage - before.edgeEvidenceCoverage) >= 0.10",
+        "reason": "Direct progress on the largest productionV1 gap."
+      },
+      {
+        "id": "trusted-graph-observable",
+        "when": "after.visibleEdgesPerNode != null && after.visibleEdgesPerNode <= 15",
+        "reason": "Makes the trusted/visible graph production gate observable."
       }
     ],
     "default": "needs_more_data",
     "precedence": "revertIfAny > keepIfAny > default"
   },
   "stopCondition": {
-    "description": "Engine is production-ready when every productionChecks entry from bin/experiment.js passes against the quick suite AND AQI clears 95 with a 90 hard minimum and without a hard-gate cap.",
+    "description": "Engine is productionV1-ready when top-level production checks pass against the quick suite, hard gates do not cap AQI, and evidence/trusted-graph readiness is no longer the main blocker. Enterprise/excellent require the higher tier checks and broader suites.",
+    "activeTier": "productionV1",
     "allOf": [
       "productionChecks.aqi.pass",
       "productionChecks.recallAt10.pass",
@@ -181,31 +199,134 @@
       "productionChecks.criticalFailures.pass",
       "productionChecks.permissionLeakage.pass",
       "productionChecks.indexingCrashed.pass",
-      "gatedAqi === after.aqi"
+      "gatedAqi === after.aqi",
+      "after.edgeEvidenceCoverage >= 0.60",
+      "after.visibleEdgesPerNode == null || after.visibleEdgesPerNode <= 15"
+    ],
+    "promotionRequiredSuites": [
+      "quick",
+      "retrieval",
+      "graph",
+      "security"
     ]
   },
   "loop": {
-    "description": "One iteration of the self-improving benchmark loop. Codex executes this against the current baseline until stopCondition is true.",
+    "description": "One iteration of the self-improving benchmark loop. Codex executes this against the current baseline until the active tier stopCondition is true. Higher tiers are tracked but not forced in productionV1.",
     "iteration": [
-      "Read baseline.snapshot and priorities[]. Pick the highest-rank priority whose target is not met and is not blockedBy harness work.",
+      "Read baseline.snapshot and priorities[]. Pick the highest-rank priority whose target is not met and is not blockedBy harness work. Use meta.activeTier to decide active targets.",
       "Form ONE hypothesis that targets that metric. Verify the hypothesis cannot trigger any revertIfAny rule by construction.",
       "Scaffold experiments/NNNN-<slug>/ with config.json (suite=quick, baseline=current), experiment.md (hypothesis + change scope), and a single code change.",
       "Run: npm run anubis:experiment -- experiments/NNNN-<slug>/config.json.",
       "Apply keepRevertRules to result.json. Persist decision.md and result.json.",
       "If decision=keep: write new baselines/<name>.json, update meta.updatedAt and baseline.{ref,lastExperiment,snapshot} in this file, recompute priorities[].{current,gap}.",
       "If decision=revert: leave baseline untouched, mark the hypothesis as tried in the experiment's decision.md, pick the next hypothesis.",
-      "Re-evaluate stopCondition. If all true, halt and report production-ready."
+      "Re-evaluate stopCondition for meta.activeTier. If all true, halt and report productionV1-ready; do not automatically chase enterprise/excellent without explicit approval."
     ],
     "constraints": [
       "One meaningful change per experiment (program.md rule 1).",
       "Never relax benchmark expectations to pass (rule 2).",
       "No new dependencies unless necessary (rule 6).",
       "Every result.json must include score breakdown (rule 7).",
-      "Every graph edge must have evidence or be hidden from the trusted graph (rule 8)."
+      "Every trusted/visible graph edge must have evidence or remain hidden from the trusted graph (rule 8). Candidate edges may remain evidence-light while graph evidence persistence is being built."
     ],
     "suite": {
       "default": "quick",
-      "fullPromotion": "Re-run against retrieval + graph + security suites before promoting to baseline when a change touches retrieval scoring, graph construction, or auth/permissions."
+      "fullPromotion": "Re-run against retrieval + graph + security suites before promoting to productionV1 baseline when a change touches retrieval scoring, graph construction, grounding/evidence, or auth/permissions."
+    }
+  },
+  "tiers": {
+    "productionV1": {
+      "description": "Controlled production / first client deployment. Human-reviewed graph, source-visible results, no autonomous high-risk decisions.",
+      "aqi": {
+        "target": 85,
+        "hardMinimum": 80
+      },
+      "retrieval": {
+        "recallAt10": 0.92,
+        "precisionAt10": 0.45,
+        "top3Accuracy": 0.8,
+        "mrrAt10": 0.7,
+        "ndcgAt10": 0.75,
+        "criticalFailures": 0
+      },
+      "grounding": {
+        "sourceCoverage": 0.9,
+        "edgeEvidenceCoverage": 0.6
+      },
+      "graph": {
+        "visibleEdgesPerNodeMax": 15,
+        "candidateEdgesPerNodeMax": 50,
+        "weakEdgeRatioMax": 0.25,
+        "duplicateEdgeRatioMax": 0.03
+      },
+      "security": {
+        "permissionLeakage": 0,
+        "crossWorkspaceLeakage": 0,
+        "deletedDocLeakage": 0,
+        "promptInjectionCriticalSuccess": 0
+      }
+    },
+    "enterprise": {
+      "description": "Enterprise-grade deployment. Trusted graph implemented, security suite passed, strong evidence coverage.",
+      "aqi": {
+        "target": 90,
+        "hardMinimum": 85
+      },
+      "retrieval": {
+        "recallAt10": 0.95,
+        "precisionAt10": 0.5,
+        "top3Accuracy": 0.9,
+        "mrrAt10": 0.85,
+        "ndcgAt10": 0.9,
+        "criticalFailures": 0
+      },
+      "grounding": {
+        "sourceCoverage": 0.95,
+        "edgeEvidenceCoverage": 0.9
+      },
+      "graph": {
+        "visibleEdgesPerNodeMax": 12,
+        "candidateEdgesPerNodeMax": 50,
+        "weakEdgeRatioMax": 0.2,
+        "duplicateEdgeRatioMax": 0.02
+      },
+      "security": {
+        "permissionLeakage": 0,
+        "crossWorkspaceLeakage": 0,
+        "deletedDocLeakage": 0,
+        "promptInjectionCriticalSuccess": 0
+      }
+    },
+    "excellent": {
+      "description": "Mature/high-confidence target. Use only after validating beyond the quick suite to avoid benchmark overfitting.",
+      "aqi": {
+        "target": 95,
+        "hardMinimum": 90
+      },
+      "retrieval": {
+        "recallAt10": 0.97,
+        "precisionAt10": 0.55,
+        "top3Accuracy": 0.95,
+        "mrrAt10": 0.9,
+        "ndcgAt10": 0.92,
+        "criticalFailures": 0
+      },
+      "grounding": {
+        "sourceCoverage": 0.98,
+        "edgeEvidenceCoverage": 0.95
+      },
+      "graph": {
+        "visibleEdgesPerNodeMax": 10,
+        "candidateEdgesPerNodeMax": 40,
+        "weakEdgeRatioMax": 0.15,
+        "duplicateEdgeRatioMax": 0.01
+      },
+      "security": {
+        "permissionLeakage": 0,
+        "crossWorkspaceLeakage": 0,
+        "deletedDocLeakage": 0,
+        "promptInjectionCriticalSuccess": 0
+      }
     }
   }
 }

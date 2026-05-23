@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0043-reference-mentioned-doc-rerank",
+  "aqi": 73.2,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 566,
+  "edges": 53145,
+  "edgesPerChunk": 93.9,
+  "indexPassTimeSec": 30.79,
+  "throughputFilesPerSec": 1.7,
+  "throughputKbPerSec": 3.6,
+  "queryLatency": {
+    "averageMs": 255,
+    "p50Ms": 245,
+    "p95Ms": 330,
+    "p99Ms": 330
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.9,
+    "averagePrecisionAtK": 0.21,
+    "recallAt10": 0.93,
+    "precisionAt10": 0.53,
+    "top3Accuracy": 0.93,
+    "mrrAt10": 0.93,
+    "ndcgAt10": 0.92,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 93.9,
+    "visibleEdges": 1779,
+    "visibleEdgesPerNode": 3.14,
+    "candidateEdges": 53145
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

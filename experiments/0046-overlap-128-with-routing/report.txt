@@ -1,0 +1,289 @@
+========================================================================
+                      ANUBIS ENGINE BENCHMARK REPORT
+========================================================================
+[SYSTEM INFO]
+  Corpus Scale     : quick
+  Bootstrap Time   : 1762 ms
+  Database Path    : C:\Users\User\AppData\Local\Temp\anubis-benchmark-run-DUxhpF\workdirs\b3e23b98519f401a\anubis.db
+  Database Size    : 12.6 MB
+
+[INDEXING PERFORMANCE]
+  Pre-pass Plan    : 13 files checked, 9 cache hits, 4 expected OCR runs
+  Index Pass Time  : 26.27 s
+  Throughput       : 2 files/sec (4.2 KB/s)
+  Total Row Counts : Documents: 52 | Chunks: 449 | Edges: 33521
+  Phase Timings    : discovery n/a | cache n/a | text n/a | OCR n/a | chunking n/a | embedding n/a | edges n/a | db n/a | total 26269 ms
+
+[GRAPH QUALITY]
+  Total Nodes      : 449
+  Total Edges      : 33521
+  Edges/Chunk      : 74.66
+  Candidate Edges  : 33521
+  Visible Edges    : 1419
+  Visible/Node     : 3.16
+  Weak Edge Ratio  : n/a
+  Duplicate Ratio  : n/a
+  Evidence Coverage: 1.00
+
+[QUERY LATENCY]
+  Average Latency  : 187 ms
+  p50 Latency      : 189 ms
+  p95 Latency      : 231 ms
+  p99 Latency      : 231 ms
+
+[RETRIEVAL ACCURACY]
+  ----------------------------------------------------------------------
+  Query                         Recall@10 Prec@10  Status        Latency
+  ----------------------------------------------------------------------
+  1. printer replacement        1.00      0.50     weak_pass       149 ms
+  2. atlas incident anchor      1.00      0.60     fail            231 ms
+  3. active module listing      1.00      1.00     strong_pass     192 ms
+  4. audit item 42              1.00      0.90     weak_pass       211 ms
+  5. payment ledger             1.00      0.40     weak_pass       175 ms
+  6. route optimization         1.00      0.50     weak_pass       114 ms
+  7. slotting reserve           1.00      0.50     weak_pass       180 ms
+  8. webhook retry              1.00      0.40     weak_pass       190 ms
+  9. session token              1.00      0.40     weak_pass       207 ms
+  10. pick pack wave            1.00      0.40     weak_pass       188 ms
+  11. offline scan              1.00      0.40     weak_pass       189 ms
+  12. alert error               1.00      0.10     weak_pass       224 ms
+  13. invoice approval          1.00      0.20     critical_fail   187 ms
+  14. surya node                1.00      0.50     pass            192 ms
+  15. retention audit           1.00      0.40     weak_pass       177 ms
+  ----------------------------------------------------------------------
+  Average                       1.00      0.48     
+  Average Recall@5              0.90
+  Average Precision@5           0.73
+  Legacy Avg Recall@K           0.90
+  Legacy Avg Precision@K        0.24
+  Top-1 Accuracy                0.93
+  Top-3 Accuracy                0.93
+  MRR@10                        0.94
+  nDCG@10                       0.94
+
+[QUERY STATUS]
+  Strong Pass     : 1
+  Pass            : 1
+  Weak Pass       : 11
+  Fail            : 1
+  Critical Fail   : 1
+
+[STRUCTURAL ASSERTIONS]
+  Graph Evidence   : PASS
+  Downrank         : PASS (reference document did not enter top results)
+  JSON Chunking    : PASS
+
+[SCORE BREAKDOWN]
+  printer replacement
+    1. shipping_module.md final=0.86 vec=0.99 bm25=1.00 graph=0.00 entity=0.73 source=0.83
+    2. shipping_module.md final=0.86 vec=0.99 bm25=1.00 graph=0.00 entity=0.73 source=0.83
+    3. shipping_module.md final=0.85 vec=0.99 bm25=0.98 graph=0.00 entity=0.73 source=0.83
+    4. shipping_module.md final=0.85 vec=1.00 bm25=0.87 graph=0.00 entity=1.00 source=0.84
+    5. syslog_03.txt final=0.75 vec=0.98 bm25=0.72 graph=0.00 entity=0.66 source=0.79
+    6. shipping_module.md final=0.72 vec=0.96 bm25=0.82 graph=0.00 entity=0.00 source=0.84
+    7. inventory_audit.json final=0.53 vec=0.92 bm25=0.27 graph=0.00 entity=0.26 source=0.89
+    8. syslog_07.txt final=0.51 vec=0.92 bm25=0.21 graph=0.00 entity=0.33 source=0.77
+    9. inventory_audit.json final=0.48 vec=0.91 bm25=0.21 graph=0.00 entity=0.00 source=0.90
+    10. activity_log.csv final=0.43 vec=0.91 bm25=0.00 graph=0.00 entity=0.13 source=0.96
+  atlas incident anchor
+    1. shipping_module.md final=0.54 vec=0.00 bm25=0.71 graph=1.00 entity=1.00 source=0.84
+    2. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.83
+    3. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.85
+    4. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.83
+    5. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.83
+    6. syslog_03.txt final=0.89 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.79
+    7. readme_master.md final=0.52 vec=0.98 bm25=0.64 graph=0.00 entity=1.00 source=0.88
+    8. activity_log.csv final=0.44 vec=0.97 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    9. activity_log.csv final=0.44 vec=0.97 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    10. activity_log.csv final=0.44 vec=0.97 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+  active module listing
+    1. billing_module.md final=0.69 vec=0.98 bm25=0.00 graph=1.00 entity=1.00 source=0.88
+    2. inventory_module.md final=0.44 vec=0.99 bm25=0.00 graph=1.00 entity=0.00 source=0.86
+    3. inventory_module.md final=0.44 vec=0.99 bm25=0.00 graph=1.00 entity=0.00 source=0.87
+    4. inventory_module.md final=0.29 vec=0.00 bm25=0.00 graph=1.00 entity=1.00 source=0.87
+    5. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=1.00 entity=0.00 source=0.88
+    6. inventory_module.md final=0.00 vec=0.00 bm25=0.00 graph=1.00 entity=0.00 source=0.89
+    7. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=1.00 entity=0.00 source=0.89
+    8. billing_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.88
+    9. billing_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.93 entity=0.00 source=0.90
+    10. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=1.00 entity=0.00 source=0.89
+  audit item 42
+    1. inventory_audit.json final=0.87 vec=1.00 bm25=1.00 graph=0.00 entity=0.80 source=0.90
+    2. inventory_audit.json final=0.45 vec=1.00 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    3. inventory_audit.json final=0.44 vec=0.99 bm25=0.00 graph=0.00 entity=0.00 source=0.92
+    4. activity_log.csv final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    5. inventory_audit.json final=0.44 vec=0.99 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    6. inventory_audit.json final=0.44 vec=0.99 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    7. inventory_audit.json final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    8. inventory_audit.json final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    9. inventory_audit.json final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    10. inventory_audit.json final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+  payment ledger
+    1. billing_module.md final=0.88 vec=1.00 bm25=1.00 graph=0.00 entity=0.91 source=0.88
+    2. billing_module.md final=0.88 vec=1.00 bm25=1.00 graph=0.00 entity=0.91 source=0.87
+    3. billing_module.md final=0.88 vec=1.00 bm25=0.99 graph=0.00 entity=0.91 source=0.89
+    4. billing_module.md final=0.85 vec=1.00 bm25=0.89 graph=0.00 entity=1.00 source=0.87
+    5. img_invoice_02.png final=0.57 vec=0.93 bm25=0.33 graph=0.00 entity=0.41 source=0.93
+    6. img_invoice_02.png final=0.57 vec=0.93 bm25=0.32 graph=0.00 entity=0.33 source=0.94
+    7. inventory_audit.json final=0.42 vec=0.93 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    8. inventory_audit.json final=0.42 vec=0.93 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    9. inventory_audit.json final=0.42 vec=0.92 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    10. inventory_audit.json final=0.42 vec=0.92 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+  route optimization
+    1. routing_module.md final=0.89 vec=0.99 bm25=1.00 graph=0.00 entity=1.00 source=0.97
+    2. routing_module.md final=0.89 vec=0.99 bm25=1.00 graph=0.00 entity=1.00 source=0.97
+    3. routing_module.md final=0.88 vec=0.99 bm25=0.95 graph=0.00 entity=1.00 source=0.97
+    4. routing_module.md final=0.80 vec=1.00 bm25=0.83 graph=0.00 entity=0.62 source=0.88
+    5. routing_module.md final=0.80 vec=0.97 bm25=0.94 graph=0.00 entity=0.37 source=0.89
+    6. video_record_05.mp4 final=0.49 vec=0.91 bm25=0.18 graph=0.00 entity=0.08 source=1.00
+    7. video_record_04.mp4 final=0.49 vec=0.91 bm25=0.18 graph=0.00 entity=0.08 source=0.98
+    8. video_record_03.mp4 final=0.49 vec=0.91 bm25=0.18 graph=0.00 entity=0.08 source=0.97
+    9. video_record_02.mp4 final=0.49 vec=0.91 bm25=0.18 graph=0.00 entity=0.08 source=0.95
+    10. video_record_01.mp4 final=0.48 vec=0.91 bm25=0.18 graph=0.00 entity=0.08 source=0.94
+  slotting reserve
+    1. inventory_module.md final=0.87 vec=0.97 bm25=1.00 graph=0.00 entity=0.93 source=0.87
+    2. inventory_module.md final=0.87 vec=0.97 bm25=1.00 graph=0.00 entity=0.93 source=0.86
+    3. inventory_module.md final=0.86 vec=0.98 bm25=0.94 graph=0.00 entity=0.93 source=0.84
+    4. inventory_module.md final=0.84 vec=1.00 bm25=0.84 graph=0.00 entity=1.00 source=0.84
+    5. inventory_module.md final=0.75 vec=0.96 bm25=0.93 graph=0.00 entity=0.00 source=0.83
+    6. inventory_audit.json final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.93
+    7. inventory_audit.json final=0.40 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.94
+    8. inventory_audit.json final=0.40 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.94
+    9. catalog_module.md final=0.40 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.82
+    10. returns_module.md final=0.40 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.82
+  webhook retry
+    1. notifications_module.md final=0.87 vec=0.97 bm25=1.00 graph=0.00 entity=0.91 source=0.84
+    2. notifications_module.md final=0.86 vec=0.95 bm25=1.00 graph=0.00 entity=0.91 source=0.80
+    3. notifications_module.md final=0.85 vec=1.00 bm25=0.88 graph=0.00 entity=1.00 source=0.81
+    4. notifications_module.md final=0.84 vec=0.96 bm25=0.92 graph=0.00 entity=0.91 source=0.81
+    5. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    6. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    7. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    8. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    9. returns_module.md final=0.40 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.80
+    10. activity_log.csv final=0.00 vec=0.00 bm25=0.00 graph=0.99 entity=0.00 source=1.00
+  session token
+    1. auth_module.md final=0.88 vec=0.96 bm25=1.00 graph=0.00 entity=1.00 source=0.91
+    2. auth_module.md final=0.88 vec=0.95 bm25=1.00 graph=0.00 entity=1.00 source=0.89
+    3. auth_module.md final=0.86 vec=0.97 bm25=0.92 graph=0.00 entity=1.00 source=0.89
+    4. auth_module.md final=0.84 vec=1.00 bm25=0.87 graph=0.00 entity=0.92 source=0.86
+    5. inventory_audit.json final=0.40 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.97
+    6. inventory_audit.json final=0.40 vec=0.88 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    7. inventory_audit.json final=0.40 vec=0.88 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    8. inventory_audit.json final=0.40 vec=0.88 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    9. inventory_audit.json final=0.40 vec=0.88 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    10. inventory_audit.json final=0.01 vec=0.00 bm25=0.00 graph=0.99 entity=0.08 source=1.00
+  pick pack wave
+    1. fulfillment_module.md final=0.89 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.78
+    2. fulfillment_module.md final=0.80 vec=0.96 bm25=0.86 graph=0.00 entity=0.75 source=0.85
+    3. fulfillment_module.md final=0.80 vec=0.96 bm25=0.86 graph=0.00 entity=0.75 source=0.82
+    4. fulfillment_module.md final=0.78 vec=0.97 bm25=0.80 graph=0.00 entity=0.75 source=0.81
+    5. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    6. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    7. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    8. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    9. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    10. activity_log.csv final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.98
+  offline scan
+    1. mobile_module.md final=0.88 vec=0.97 bm25=1.00 graph=0.00 entity=1.00 source=0.83
+    2. mobile_module.md final=0.86 vec=0.97 bm25=1.00 graph=0.00 entity=0.87 source=0.80
+    3. mobile_module.md final=0.86 vec=1.00 bm25=0.90 graph=0.00 entity=0.98 source=0.82
+    4. mobile_module.md final=0.84 vec=0.98 bm25=0.92 graph=0.00 entity=0.87 source=0.80
+    5. activity_log.csv final=0.44 vec=0.91 bm25=0.00 graph=0.00 entity=0.25 source=0.99
+    6. activity_log.csv final=0.41 vec=0.91 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    7. activity_log.csv final=0.41 vec=0.91 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    8. activity_log.csv final=0.41 vec=0.91 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    9. activity_log.csv final=0.41 vec=0.91 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    10. activity_log.csv final=0.41 vec=0.91 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+  alert error
+    1. syslog_07.txt final=0.89 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.77
+    2. activity_log.csv final=0.52 vec=0.92 bm25=0.23 graph=0.00 entity=0.22 source=0.96
+    3. activity_log.csv final=0.50 vec=0.91 bm25=0.23 graph=0.00 entity=0.04 source=0.99
+    4. activity_log.csv final=0.50 vec=0.91 bm25=0.22 graph=0.00 entity=0.04 source=0.99
+    5. activity_log.csv final=0.49 vec=0.91 bm25=0.22 graph=0.00 entity=0.00 source=0.98
+    6. activity_log.csv final=0.48 vec=0.91 bm25=0.22 graph=0.00 entity=0.00 source=0.87
+    7. inventory_audit.json final=0.42 vec=0.91 bm25=0.00 graph=0.00 entity=0.09 source=0.89
+    8. syslog_03.txt final=0.41 vec=0.92 bm25=0.00 graph=0.00 entity=0.04 source=0.79
+    9. activity_log.csv final=0.41 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    10. activity_log.csv final=0.41 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+  invoice approval
+    1. video_record_05.mp4 final=0.15 vec=0.00 bm25=0.28 graph=0.00 entity=0.00 source=1.00
+    2. video_record_03.mp4 final=0.05 vec=0.00 bm25=0.14 graph=0.00 entity=0.00 source=0.97
+    3. video_record_04.mp4 final=0.00 vec=0.00 bm25=0.00 graph=0.00 entity=0.05 source=0.98
+    4. video_record_01.mp4 final=0.00 vec=0.00 bm25=0.00 graph=0.00 entity=0.05 source=0.94
+    5. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.83 entity=0.00 source=0.85
+    6. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.89 entity=0.00 source=0.86
+    7. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.82 entity=0.00 source=0.85
+    8. shipping_module.md final=0.00 vec=0.00 bm25=0.00 graph=0.83 entity=0.00 source=0.86
+    9. img_invoice_02.png final=0.90 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.92
+    10. img_invoice_02.png final=0.86 vec=1.00 bm25=0.97 graph=0.00 entity=0.76 source=0.91
+  surya node
+    1. shipping_module.md final=0.78 vec=0.98 bm25=1.00 graph=0.00 entity=0.00 source=0.85
+    2. inventory_audit.json final=0.75 vec=1.00 bm25=0.88 graph=0.00 entity=0.00 source=0.90
+    3. activity_log.csv final=0.54 vec=0.98 bm25=0.00 graph=0.00 entity=0.96 source=1.00
+    4. activity_log.csv final=0.54 vec=0.98 bm25=0.00 graph=0.00 entity=0.96 source=0.98
+    5. activity_log.csv final=0.54 vec=0.98 bm25=0.00 graph=0.00 entity=1.00 source=0.88
+    6. activity_log.csv final=0.53 vec=0.98 bm25=0.00 graph=0.00 entity=0.89 source=0.99
+    7. activity_log.csv final=0.52 vec=0.98 bm25=0.00 graph=0.00 entity=0.77 source=1.00
+    8. shipping_module.md final=0.48 vec=0.00 bm25=0.60 graph=0.93 entity=0.89 source=0.84
+    9. shipping_module.md final=0.48 vec=0.00 bm25=0.60 graph=0.93 entity=0.89 source=0.84
+    10. shipping_module.md final=0.48 vec=0.00 bm25=0.59 graph=0.93 entity=0.89 source=0.84
+  retention audit
+    1. compliance_module.md final=0.89 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.76
+    2. compliance_module.md final=0.79 vec=0.95 bm25=0.83 graph=0.00 entity=0.75 source=0.85
+    3. compliance_module.md final=0.78 vec=0.95 bm25=0.82 graph=0.00 entity=0.75 source=0.81
+    4. compliance_module.md final=0.77 vec=0.95 bm25=0.77 graph=0.00 entity=0.75 source=0.82
+    5. inventory_audit.json final=0.41 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.99
+    6. inventory_audit.json final=0.41 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    7. inventory_audit.json final=0.41 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=1.00
+    8. returns_module.md final=0.40 vec=0.90 bm25=0.00 graph=0.00 entity=0.00 source=0.86
+    9. notifications_module.md final=0.40 vec=0.89 bm25=0.00 graph=0.00 entity=0.00 source=0.87
+    10. inventory_audit.json final=0.24 vec=0.00 bm25=0.00 graph=1.00 entity=0.40 source=1.00
+
+
+[CRITICAL FAILURE DIAGNOSTICS]
+  Query: VID-APPROVAL-005 invoice approval
+  Expected docs indexed : true
+  Expected chunks indexed: true
+  Exact query terms      : true
+  Alias terms            : true
+  Found in BM25 view     : true
+  Found in vector view   : true
+  Found in graph view    : false
+  Found in merged view   : true
+  Found in final top K   : false
+  Dropped at stage       : final_ranking
+  Likely cause           : ranking_or_diversification
+  Expected evidence:
+    - img_invoice_02.png doc=c00f764c-2535-4cd3-a0ea-55a1c25657a3 chunks=2 exactTerms=true aliases=dock payment evidence, VID-APPROVAL-005, invoice approval path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+  Top BM25 candidates:
+    1. img_invoice_02.png final=0.90 bm25=1.00 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    2. img_invoice_02.png final=0.86 bm25=0.97 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    3. readme_master.md final=0.37 bm25=0.38 vec=0.95 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\readme_master.md
+    4. video_record_05.mp4 final=0.53 bm25=0.28 vec=0.93 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_05.mp4
+    5. img_invoice_03.png final=0.29 bm25=0.18 vec=0.00 graph=0.93 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_03.png
+  Top vector candidates:
+    1. img_invoice_02.png final=0.90 bm25=1.00 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    2. img_invoice_02.png final=0.86 bm25=0.97 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    3. inventory_audit.json final=0.46 bm25=0.09 vec=0.96 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+    4. readme_master.md final=0.37 bm25=0.38 vec=0.95 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\readme_master.md
+    5. inventory_audit.json final=0.43 bm25=0.00 vec=0.95 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+  Top graph candidates:
+    1. video_record_01.mp4 final=0.05 bm25=0.14 vec=0.00 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_01.mp4
+    2. activity_log.csv final=0.42 bm25=0.00 vec=0.93 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+    3. video_record_04.mp4 final=0.05 bm25=0.14 vec=0.00 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_04.mp4
+    4. inventory_audit.json final=0.42 bm25=0.00 vec=0.93 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+    5. activity_log.csv final=0.42 bm25=0.00 vec=0.93 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+  Final merged top results:
+    1. img_invoice_02.png final=0.90 bm25=1.00 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    2. img_invoice_02.png final=0.86 bm25=0.97 vec=1.00 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+    3. video_record_05.mp4 final=0.53 bm25=0.28 vec=0.93 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_05.mp4
+    4. video_record_03.mp4 final=0.47 bm25=0.14 vec=0.93 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_03.mp4
+    5. img_invoice_03.png final=0.29 bm25=0.18 vec=0.00 graph=0.93 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_03.png
+  Rules considered       : reference_doc_text_signal_multiplier, low_signal_chunk_text_multiplier, centrality_relevance_gate, max_results_per_doc_diversification
+  Notes                  : Raw BM25/vector/graph candidate pools are not exposed by the current MCP API; candidate lists are component-sorted views of the debug diagnostic search result set.
+
+
+========================================================================
+   ANUBIS QUALITY INDEX (AQI): 79.2 / 100
+========================================================================

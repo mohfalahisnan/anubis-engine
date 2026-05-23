@@ -48,6 +48,7 @@ const MAX_RESULTS_PER_DOC: usize = 10;
 
 /// Fan-out cap during graph BFS so a hot node doesn't explode the candidate pool.
 const EXPANSION_FANOUT: usize = 3;
+const ENABLE_GRAPH_EXPANSION: bool = false;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct QueryOpts {
@@ -122,7 +123,7 @@ pub fn final_score(s: &ScoreParts) -> f32 {
     let text_score =
         (W_VEC * s.score_vec + W_BM25 * s.score_bm25) * text_multiplier * low_signal_multiplier;
     let entity_score = W_ENTITY * s.score_entity * low_signal_multiplier;
-    let graph_score = if s.score_bm25 > 0.0 || s.score_entity > 0.0 {
+    let graph_score = if s.score_bm25.max(s.score_entity) >= CENTRALITY_RELEVANCE_GATE {
         W_GRAPH * s.score_graph
     } else {
         0.0
@@ -144,7 +145,7 @@ pub fn run_query(
     query_embedding: &[f32],
     opts: QueryOpts,
 ) -> Result<Vec<QueryResult>, EngineError> {
-    let pool_size = (opts.limit * 4).max(20);
+    let pool_size = opts.limit.max(10);
 
     // (1) Vector candidates
     let vector_hits = vectors::search_vectors(conn, query_embedding, pool_size)?;
@@ -194,9 +195,10 @@ pub fn run_query(
     if !pool.is_empty() {
         populate_chunk_metadata(conn, &mut pool)?;
     }
+    add_reference_routed_candidates(conn, query_text, &mut pool)?;
 
     // (4) Graph expansion at depth > 0: add chunks reachable from top seeds.
-    if opts.depth > 0 && !pool.is_empty() {
+    if ENABLE_GRAPH_EXPANSION && opts.depth > 0 && !pool.is_empty() {
         let seeds = top_seed_ids(&pool, 10);
         let expansion = expand_via_graph(conn, &seeds, opts.depth)?;
         for (id, expansion_score) in expansion {
@@ -206,10 +208,8 @@ pub fn run_query(
         }
     }
 
-    // (5) Centrality: write into score_centrality (gated in final_score by
-    // CENTRALITY_RELEVANCE_GATE so hubs can't surface on weak matches).
+    // (5) Metadata refresh after graph/reference expansion.
     if !pool.is_empty() {
-        populate_centrality(conn, &mut pool)?;
         populate_chunk_metadata(conn, &mut pool)?;
     }
 
@@ -221,6 +221,7 @@ pub fn run_query(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
+    let scored = prefer_reference_mentioned_docs(conn, query_text, scored)?;
     let selected = diversify_per_doc(
         conn,
         prefer_content_chunks(scored),
@@ -479,7 +480,7 @@ fn expand_via_graph(
             ELSE src_chunk
         END
         WHERE (src_chunk = ?1 OR dst_chunk = ?1)
-          AND edge_type IN ('shared_anchor', 'shared_entity', 'semantic')
+          AND edge_type IN ('shared_anchor', 'shared_entity', 'manifest_overlap', 'semantic')
           AND weight >= ?2
           AND neighbor_chunk.chunk_signal = 'content'
         ORDER BY weight DESC
@@ -617,6 +618,198 @@ fn prefer_content_chunks(sorted_scores: Vec<ScoreParts>) -> Vec<ScoreParts> {
     }
     content.extend(low_signal);
     content
+}
+
+fn query_terms(query_text: &str) -> Vec<String> {
+    query_text
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .map(str::to_ascii_lowercase)
+        .filter(|term| term.len() > 2)
+        .collect()
+}
+
+fn reference_text_for_query(conn: &Connection, query_text: &str) -> Result<String, EngineError> {
+    let terms = query_terms(query_text);
+    if terms.is_empty() {
+        return Ok(String::new());
+    }
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.content
+        FROM chunks c
+        JOIN documents d ON d.id = c.doc_id
+        WHERE d.doc_class = 'reference'
+          AND d.status = 'indexed'
+          AND c.chunk_signal = 'content'
+        "#,
+    )?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let content = row?;
+        let lower = content.to_ascii_lowercase();
+        if terms.iter().all(|term| lower.contains(term)) {
+            out.push(lower);
+        }
+    }
+    Ok(out.join("\n"))
+}
+
+fn filenames_mentioned_by_reference(
+    conn: &Connection,
+    reference_text: &str,
+) -> Result<HashSet<String>, EngineError> {
+    if reference_text.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT filename
+        FROM documents
+        WHERE doc_class = 'content'
+          AND status = 'indexed'
+        "#,
+    )?;
+    let filenames = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut mentioned = HashSet::new();
+    for filename in filenames {
+        let filename = filename?;
+        if reference_text.contains(&filename.to_ascii_lowercase()) {
+            mentioned.insert(filename);
+        }
+    }
+    Ok(mentioned)
+}
+
+fn add_reference_routed_candidates(
+    conn: &Connection,
+    query_text: &str,
+    pool: &mut HashMap<String, ScoreParts>,
+) -> Result<(), EngineError> {
+    let reference_text = reference_text_for_query(conn, query_text)?;
+    let mentioned = filenames_mentioned_by_reference(conn, &reference_text)?;
+    if mentioned.is_empty() {
+        return Ok(());
+    }
+
+    let terms = query_terms(query_text);
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT c.id, c.content
+        FROM chunks c
+        JOIN documents d ON d.id = c.doc_id
+        WHERE d.filename = ?1
+          AND d.doc_class = 'content'
+          AND d.status = 'indexed'
+          AND c.chunk_signal = 'content'
+        ORDER BY c.chunk_index
+        LIMIT 6
+        "#,
+    )?;
+    for filename in mentioned {
+        let rows = stmt.query_map([filename.as_str()], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (chunk_id, content) = row?;
+            let lower = content.to_ascii_lowercase();
+            if !terms.iter().all(|term| lower.contains(term)) {
+                continue;
+            }
+            let entry = pool
+                .entry(chunk_id.clone())
+                .or_insert_with(|| ScoreParts::new(chunk_id));
+            entry.score_graph = entry.score_graph.max(1.0);
+        }
+    }
+    Ok(())
+}
+
+fn prefer_reference_mentioned_docs(
+    conn: &Connection,
+    query_text: &str,
+    sorted_scores: Vec<ScoreParts>,
+) -> Result<Vec<ScoreParts>, EngineError> {
+    if sorted_scores.is_empty() {
+        return Ok(sorted_scores);
+    }
+
+    let ids: Vec<String> = sorted_scores.iter().map(|s| s.chunk_id.clone()).collect();
+    let placeholders = std::iter::repeat("?")
+        .take(ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        r#"
+        SELECT c.id, d.filename, d.doc_class, c.content
+        FROM chunks c
+        JOIN documents d ON d.id = c.doc_id
+        WHERE c.id IN ({})
+        "#,
+        placeholders
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows: HashMap<String, (String, String, String)> = stmt
+        .query_map(params_from_iter(ids.iter().map(|s| s.as_str())), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                (
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ),
+            ))
+        })?
+        .collect::<Result<HashMap<_, _>, _>>()?;
+
+    let mut reference_text = sorted_scores
+        .iter()
+        .filter(|score| score.relevance() >= CENTRALITY_RELEVANCE_GATE)
+        .filter_map(|score| rows.get(&score.chunk_id))
+        .filter(|(_filename, doc_class, _content)| doc_class == "reference")
+        .map(|(_filename, _doc_class, content)| content.to_ascii_lowercase())
+        .collect::<Vec<_>>()
+        .join("\n");
+    if reference_text.is_empty() {
+        reference_text = reference_text_for_query(conn, query_text)?;
+    }
+    if reference_text.is_empty() {
+        return Ok(sorted_scores);
+    }
+
+    let mentioned: HashSet<String> = rows
+        .values()
+        .filter(|(_filename, doc_class, _content)| doc_class == "content")
+        .filter_map(|(filename, _doc_class, _content)| {
+            let lower = filename.to_ascii_lowercase();
+            reference_text.contains(&lower).then_some(filename.clone())
+        })
+        .collect();
+    if mentioned.is_empty() {
+        return Ok(sorted_scores);
+    }
+
+    let mut routed = Vec::with_capacity(sorted_scores.len());
+    let mut rest = Vec::new();
+    let mut routed_filenames = HashSet::new();
+    for score in sorted_scores {
+        let mentioned_filename = rows
+            .get(&score.chunk_id)
+            .and_then(|(filename, _doc_class, _content)| {
+                mentioned.contains(filename).then_some(filename.clone())
+            });
+        if mentioned_filename
+            .as_ref()
+            .map(|filename| routed_filenames.insert(filename.clone()))
+            .unwrap_or(false)
+        {
+            routed.push(score);
+        } else {
+            rest.push(score);
+        }
+    }
+    routed.extend(rest);
+    Ok(routed)
 }
 
 /// Greedily take top-scored chunks, but cap how many can come from the same
@@ -831,6 +1024,27 @@ mod tests {
     }
 
     #[test]
+    fn graph_boost_ignores_weak_lexical_evidence() {
+        let weak_neighbor = ScoreParts {
+            chunk_id: "weak-neighbor".into(),
+            score_bm25: 0.10,
+            score_vec: 0.10,
+            score_graph: 1.0,
+            score_entity: 0.0,
+            score_centrality: 0.0,
+            doc_class: None,
+            chunk_signal: None,
+        };
+        let strong_neighbor = ScoreParts {
+            score_bm25: 0.20,
+            ..weak_neighbor.clone()
+        };
+
+        assert!((final_score(&weak_neighbor) - 0.075).abs() < 1e-6);
+        assert!((final_score(&strong_neighbor) - 0.26).abs() < 1e-6);
+    }
+
+    #[test]
     fn hub_cannot_outrank_a_precise_match() {
         // Real-world scenario: README-style hub vs a focused chunk.
         let hub = ScoreParts {
@@ -968,6 +1182,49 @@ mod tests {
     }
 
     #[test]
+    fn reference_mentions_prioritize_named_content_docs() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO documents (id,path,filename,format,size_bytes,hash,indexed_at,status,doc_class)
+            VALUES
+              ('doc-ref','README.md','README.md','md',1,'h','2026-05-21T00:00:00Z','indexed','reference'),
+              ('doc-a','shipping_module.md','shipping_module.md','md',1,'h','2026-05-21T00:00:00Z','indexed','content'),
+              ('doc-b','noise_module.md','noise_module.md','md',1,'h','2026-05-21T00:00:00Z','indexed','content');
+            INSERT INTO chunks (id,doc_id,chunk_index,content,char_start,char_end,created_at)
+            VALUES
+              ('ref','doc-ref',0,'README names shipping_module.md as primary evidence.',0,53,'2026-05-21T00:00:00Z'),
+              ('ship','doc-a',0,'shipping content',0,16,'2026-05-21T00:00:00Z'),
+              ('noise','doc-b',0,'noise content',0,13,'2026-05-21T00:00:00Z');
+            "#,
+        )
+        .unwrap();
+        let scores = vec![
+            ScoreParts {
+                chunk_id: "noise".into(),
+                score_bm25: 1.0,
+                ..ScoreParts::new("noise".into())
+            },
+            ScoreParts {
+                chunk_id: "ship".into(),
+                score_bm25: 1.0,
+                ..ScoreParts::new("ship".into())
+            },
+            ScoreParts {
+                chunk_id: "ref".into(),
+                score_bm25: 1.0,
+                doc_class: Some("reference".into()),
+                ..ScoreParts::new("ref".into())
+            },
+        ];
+
+        let ordered = prefer_reference_mentioned_docs(&conn, "active module listing", scores).unwrap();
+
+        assert_eq!(ordered[0].chunk_id, "ship");
+    }
+
+    #[test]
     fn entity_matches_boost_chunks_with_exact_token() {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
         migrate(&conn).unwrap();
@@ -1074,6 +1331,33 @@ mod tests {
         let ids: Vec<String> = expansion.into_iter().map(|(id, _)| id).collect();
 
         assert_eq!(ids, vec!["c4".to_string()]);
+    }
+
+    #[test]
+    fn graph_expansion_follows_manifest_overlap_edges() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed_kb(&mut conn);
+        conn.execute(
+            "INSERT INTO documents (id,path,filename,format,size_bytes,hash,indexed_at,status)
+             VALUES ('doc-c','c.md','c.md','md',1,'h','2026-05-21T00:00:00Z','indexed')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO chunks (id,doc_id,chunk_index,content,char_start,char_end,created_at)
+            VALUES ('c1','doc-c',0,'manifest backed content neighbor',0,32,'2026-05-21T00:00:00Z');
+            INSERT INTO graph_edges (src_chunk,dst_chunk,weight,edge_type)
+            VALUES ('a1','c1',0.9,'manifest_overlap');
+            "#,
+        )
+        .unwrap();
+
+        let expansion = expand_via_graph(&conn, &["a1".to_string()], 1).unwrap();
+        let ids: Vec<String> = expansion.into_iter().map(|(id, _)| id).collect();
+
+        assert_eq!(ids, vec!["c1".to_string()]);
     }
 
     #[test]

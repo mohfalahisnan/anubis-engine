@@ -5,7 +5,7 @@ use crate::{
     types::{Chunk, ParsedDoc},
 };
 
-pub const DEFAULT_WINDOW_SIZE: usize = 512;
+pub const DEFAULT_WINDOW_SIZE: usize = 384;
 pub const DEFAULT_OVERLAP: usize = 64;
 pub const DEFAULT_MIN_CHUNK: usize = 50;
 

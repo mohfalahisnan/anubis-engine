@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0047-reference-route-one-per-doc",
+  "aqi": 79.4,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 566,
+  "edges": 53145,
+  "edgesPerChunk": 93.9,
+  "indexPassTimeSec": 31.77,
+  "throughputFilesPerSec": 1.6,
+  "throughputKbPerSec": 3.5,
+  "queryLatency": {
+    "averageMs": 249,
+    "p50Ms": 242,
+    "p95Ms": 343,
+    "p99Ms": 343
+  },
+  "retrieval": {
+    "averageRecallAtK": 1,
+    "averagePrecisionAtK": 0.26,
+    "recallAt10": 1,
+    "precisionAt10": 0.47,
+    "top3Accuracy": 1,
+    "mrrAt10": 1,
+    "ndcgAt10": 0.99,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 93.9,
+    "visibleEdges": 1779,
+    "visibleEdgesPerNode": 3.14,
+    "candidateEdges": 53145
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

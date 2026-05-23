@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0048-overlap-128-after-route-cap",
+  "aqi": 86.1,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 449,
+  "edges": 33521,
+  "edgesPerChunk": 74.66,
+  "indexPassTimeSec": 26.15,
+  "throughputFilesPerSec": 2,
+  "throughputKbPerSec": 4.2,
+  "queryLatency": {
+    "averageMs": 187,
+    "p50Ms": 189,
+    "p95Ms": 231,
+    "p99Ms": 231
+  },
+  "retrieval": {
+    "averageRecallAtK": 1,
+    "averagePrecisionAtK": 0.26,
+    "recallAt10": 1,
+    "precisionAt10": 0.4,
+    "top3Accuracy": 0.93,
+    "mrrAt10": 0.95,
+    "ndcgAt10": 0.96,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 74.66,
+    "visibleEdges": 1419,
+    "visibleEdgesPerNode": 3.16,
+    "candidateEdges": 33521
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

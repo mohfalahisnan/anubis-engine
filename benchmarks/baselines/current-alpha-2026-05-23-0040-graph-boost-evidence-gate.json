@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0040-graph-boost-evidence-gate",
+  "aqi": 81.9,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 420,
+  "edges": 29340,
+  "edgesPerChunk": 69.86,
+  "indexPassTimeSec": 25.06,
+  "throughputFilesPerSec": 2.1,
+  "throughputKbPerSec": 4.4,
+  "queryLatency": {
+    "averageMs": 183,
+    "p50Ms": 183,
+    "p95Ms": 223,
+    "p99Ms": 223
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.93,
+    "averagePrecisionAtK": 0.22,
+    "recallAt10": 0.96,
+    "precisionAt10": 0.37,
+    "top3Accuracy": 0.93,
+    "mrrAt10": 0.94,
+    "ndcgAt10": 0.94,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 69.86,
+    "visibleEdges": 1302,
+    "visibleEdgesPerNode": 3.1,
+    "candidateEdges": 29340
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

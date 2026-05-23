@@ -205,7 +205,60 @@ test("score breakdown debug output is opt-in", () => {
   });
 });
 
-test("graph metrics report existing graph as candidate edges when visibility is not modeled", () => {
+test("precision diagnostics label false positives and dominant score signal", () => {
+  const diagnostic = benchmark.buildPrecisionDiagnostic({
+    testCase: {
+      label: "printer replacement",
+      query: "thermal printer printhead replacement",
+      relevantFiles: ["shipping_module.md"],
+    },
+    report: {
+      precisionAt10: 0.2,
+      topFilenames: ["shipping_module.md", "activity_log.csv", "inventory_audit.json"],
+    },
+    results: [
+      {
+        chunk_id: "chunk-good",
+        doc_id: "doc-good",
+        filename: "shipping_module.md",
+        score: 0.9,
+        score_vec: 1,
+        score_bm25: 1,
+        score_graph: 0,
+        score_entity: 1,
+      },
+      {
+        chunk_id: "chunk-graph-noise",
+        doc_id: "doc-log",
+        filename: "activity_log.csv",
+        score: 0.55,
+        score_vec: 0.91,
+        score_bm25: 0.11,
+        score_graph: 1,
+        score_entity: 0.06,
+      },
+      {
+        chunk_id: "chunk-vector-noise",
+        doc_id: "doc-inventory",
+        filename: "inventory_audit.json",
+        score: 0.42,
+        score_vec: 0.93,
+        score_bm25: 0,
+        score_graph: 0,
+        score_entity: 0,
+      },
+    ],
+  });
+
+  assert.equal(diagnostic.label, "printer replacement");
+  assert.equal(diagnostic.falsePositiveCount, 2);
+  assert.equal(diagnostic.falsePositiveProfiles.graph_assisted, 1);
+  assert.equal(diagnostic.falsePositiveProfiles.vector_only, 1);
+  assert.equal(diagnostic.falsePositives[0].filename, "activity_log.csv");
+  assert.equal(diagnostic.falsePositives[0].profile, "graph_assisted");
+});
+
+test("graph metrics split candidate edges from evidence-backed visible edges", () => {
   const metrics = benchmark.graphMetricsFromStats({
     chunks: 4,
     graph_edges: 20,
@@ -219,10 +272,10 @@ test("graph metrics report existing graph as candidate edges when visibility is 
   assert.equal(metrics.totalNodes, 4);
   assert.equal(metrics.totalEdges, 20);
   assert.equal(metrics.candidateEdges, 20);
-  assert.equal(metrics.visibleEdges, null);
+  assert.equal(metrics.visibleEdges, 4);
   assert.equal(metrics.edgesPerChunk, 5);
-  assert.equal(metrics.visibleEdgesPerNode, null);
-  assert.equal(metrics.edgeEvidenceCoverage, 0.2);
+  assert.equal(metrics.visibleEdgesPerNode, 1);
+  assert.equal(metrics.edgeEvidenceCoverage, 1);
 });
 
 test("critical failure count excludes downrank-only diagnostic probes", () => {

@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0041-overlap-256-after-graph-gate",
+  "aqi": 72.6,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 566,
+  "edges": 53145,
+  "edgesPerChunk": 93.9,
+  "indexPassTimeSec": 33.18,
+  "throughputFilesPerSec": 1.6,
+  "throughputKbPerSec": 3.3,
+  "queryLatency": {
+    "averageMs": 269,
+    "p50Ms": 260,
+    "p95Ms": 378,
+    "p99Ms": 378
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.93,
+    "averagePrecisionAtK": 0.22,
+    "recallAt10": 0.93,
+    "precisionAt10": 0.49,
+    "top3Accuracy": 0.93,
+    "mrrAt10": 0.93,
+    "ndcgAt10": 0.93,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 93.9,
+    "visibleEdges": 1779,
+    "visibleEdgesPerNode": 3.14,
+    "candidateEdges": 53145
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

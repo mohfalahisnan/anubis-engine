@@ -1,0 +1,22 @@
+{
+  "id": "0052-window-384-overlap-64",
+  "suite": "quick",
+  "baseline": "current-alpha-2026-05-23-0051-window-384-overlap-128",
+  "debug": {
+    "includeScoreBreakdown": true,
+    "includeTopResults": 10,
+    "includeCriticalFailureDiagnostics": true,
+    "includePrecisionDiagnostics": true,
+    "includeDiagnosticCandidates": 50,
+    "includeIndexingPhaseTiming": true,
+    "includeGraphMetrics": true,
+    "aliases": {
+      "invoice approval": [
+        "dock payment evidence",
+        "VID-APPROVAL-005",
+        "invoice approval"
+      ]
+    }
+  },
+  "behaviorChange": true
+}

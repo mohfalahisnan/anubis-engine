@@ -1,0 +1,44 @@
+{
+  "name": "current-alpha-2026-05-23-0052-window-384-overlap-64",
+  "aqi": 81.8,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 560,
+  "edges": 53014,
+  "edgesPerChunk": 94.67,
+  "indexPassTimeSec": 25.14,
+  "throughputFilesPerSec": 2.1,
+  "throughputKbPerSec": 4.4,
+  "queryLatency": {
+    "averageMs": 247,
+    "p50Ms": 253,
+    "p95Ms": 303,
+    "p99Ms": 303
+  },
+  "retrieval": {
+    "averageRecallAtK": 1,
+    "averagePrecisionAtK": 0.26,
+    "recallAt10": 1,
+    "precisionAt10": 0.46,
+    "top3Accuracy": 1,
+    "mrrAt10": 1,
+    "ndcgAt10": 0.99,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 1,
+    "edgesPerChunk": 94.67,
+    "visibleEdges": 1593,
+    "visibleEdgesPerNode": 2.84,
+    "candidateEdges": 53014
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

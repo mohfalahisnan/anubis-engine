@@ -468,6 +468,42 @@ function debugSearchResults(results, debug = {}) {
   }));
 }
 
+function buildPrecisionDiagnostic({ testCase, report, results }) {
+  const relevant = new Set(testCase.relevantFiles || []);
+  const falsePositives = candidateSummaries(results.slice(0, 10))
+    .filter((candidate) => !relevant.has(candidate.filename))
+    .map((candidate) => ({
+      ...candidate,
+      profile: falsePositiveProfile(candidate.scoreBreakdown || {}),
+    }));
+  const falsePositiveProfiles = falsePositives.reduce((counts, candidate) => {
+    counts[candidate.profile] = (counts[candidate.profile] || 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    label: testCase.label,
+    query: testCase.query,
+    precisionAt10: report.precisionAt10,
+    relevantFiles: Array.from(relevant),
+    falsePositiveCount: falsePositives.length,
+    falsePositiveProfiles,
+    falsePositives,
+  };
+}
+
+function falsePositiveProfile(score = {}) {
+  const vector = Number(score.vector || 0);
+  const bm25 = Number(score.bm25 || 0);
+  const graph = Number(score.graph || 0);
+  const entity = Number(score.entity || 0);
+
+  if (graph >= 0.5) return "graph_assisted";
+  if (vector > 0 && bm25 === 0 && graph === 0 && entity === 0) return "vector_only";
+  if (bm25 > 0 || entity > 0) return "lexical_entity";
+  return "other";
+}
+
 function graphMetricsFromStats(stats = {}) {
   const totalNodes = Number(stats.chunks || 0);
   const totalEdges = Number(stats.graph_edges || 0);
@@ -476,16 +512,17 @@ function graphMetricsFromStats(stats = {}) {
     (sum, key) => sum + Number(edgesByType[key] || 0),
     0,
   );
+  const visibleEdges = evidenceEdges;
   return {
     totalNodes,
     totalEdges,
     edgesPerChunk: totalNodes === 0 ? 0 : round2(totalEdges / totalNodes),
     candidateEdges: totalEdges,
-    visibleEdges: null,
-    visibleEdgesPerNode: null,
+    visibleEdges,
+    visibleEdgesPerNode: totalNodes === 0 ? 0 : round2(visibleEdges / totalNodes),
     weakEdgeRatio: null,
     duplicateEdgeRatio: null,
-    edgeEvidenceCoverage: totalEdges === 0 ? 1 : round2(evidenceEdges / totalEdges),
+    edgeEvidenceCoverage: visibleEdges === 0 ? 1 : round2(evidenceEdges / visibleEdges),
     edgesByType,
   };
 }
@@ -718,8 +755,14 @@ function decideExperiment(before, after) {
 
   const precisionGain = after.precisionAt10 - before.precisionAt10;
   const aqiGain = after.aqi - before.aqi;
+  const evidenceGain = Number(after.edgeEvidenceCoverage || 0) - Number(before.edgeEvidenceCoverage || 0);
 
-  if (precisionGain >= 0.05 || aqiGain >= 2) return "keep";
+  if (
+    precisionGain >= 0.05 ||
+    aqiGain >= 2 ||
+    evidenceGain >= 0.10 ||
+    (Number.isFinite(after.visibleEdgesPerNode) && after.visibleEdgesPerNode <= 15)
+  ) return "keep";
   return "needs_more_data";
 }
 
@@ -787,8 +830,9 @@ async function runBenchmark(options = {}) {
       const elapsed = nowMs() - queryStart;
       queryLatencies.push(elapsed);
       resultCache.set(testCase.label, results);
+      const report = evaluateSearchCase(testCase, results);
       searchReports.push({
-        ...evaluateSearchCase(testCase, results),
+        ...report,
         debugTopResults: debugSearchResults(results, debug),
         latencyMs: Math.round(elapsed),
         category: testCase.category,
@@ -807,6 +851,16 @@ async function runBenchmark(options = {}) {
           queryCases: QUERY_CASES,
           aliases: debug.aliases || {},
           candidateLimit: debug.includeDiagnosticCandidates || 50,
+        })
+      : [];
+    const precisionDiagnostics = debug.includePrecisionDiagnostics
+      ? searchReports.map((report) => {
+          const testCase = QUERY_CASES.find((item) => item.label === report.label);
+          return buildPrecisionDiagnostic({
+            testCase,
+            report,
+            results: resultCache.get(report.label) || [],
+          });
         })
       : [];
 
@@ -877,6 +931,7 @@ async function runBenchmark(options = {}) {
       downrankCheck,
       jsonCheck,
       criticalFailureDiagnostics,
+      precisionDiagnostics,
       searchReports,
       sourceFileCount: dataset.sourceFiles.length,
       scale: dataset.scale,
@@ -1488,6 +1543,7 @@ module.exports = {
   QUERY_CASES,
   buildCriticalFailureDiagnostic,
   buildCriticalFailureDiagnostics,
+  buildPrecisionDiagnostic,
   calculateAqi,
   classifyQuery,
   criticalFailureCount,
