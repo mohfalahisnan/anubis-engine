@@ -56,14 +56,16 @@ impl WorkdirRegistry {
     ) -> Result<(WorkdirId, Arc<AppState>), EngineError> {
         let (canonical, id) = workdir::resolve(workdir_input)?;
 
-        {
-            let states = self.states.lock().await;
-            if let Some(existing) = states.get(&id) {
-                let existing = existing.clone();
-                drop(states);
-                self.write_meta(&id, &canonical)?;
-                return Ok((id, existing));
-            }
+        // Hold the cache lock across the entire build so concurrent callers
+        // for the same workdir don't both try to open tantivy's IndexWriter
+        // (which holds an exclusive lockfile — the loser fails with LockBusy).
+        // AppState::new is sync; no awaits while the mutex is held.
+        let mut states = self.states.lock().await;
+        if let Some(existing) = states.get(&id) {
+            let existing = existing.clone();
+            drop(states);
+            self.write_meta(&id, &canonical)?;
+            return Ok((id, existing));
         }
 
         let storage_dir = self.root.join(id.as_str());
@@ -79,13 +81,11 @@ impl WorkdirRegistry {
         state.workdir_id = Some(id.clone());
         let state = Arc::new(state);
 
-        let returned = {
-            let mut states = self.states.lock().await;
-            states.entry(id.clone()).or_insert_with(|| state.clone()).clone()
-        };
+        states.insert(id.clone(), state.clone());
+        drop(states);
 
         self.write_meta(&id, &canonical)?;
-        Ok((id, returned))
+        Ok((id, state))
     }
 
     /// Drop the cached state, remove storage on disk. No-op for an id that
