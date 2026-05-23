@@ -5,6 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const benchmark = require("../bin/benchmark.js");
+const experiment = require("../bin/experiment.js");
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "anubis-benchmark-test-"));
@@ -353,6 +354,38 @@ test("resolveEngineBinary chooses the newest built binary", () => {
     fs.utimesSync(debug, newTime, newTime);
 
     assert.equal(benchmark.resolveEngineBinary(null, root), debug);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("MCP tool arguments include the benchmark workdir", () => {
+  const root = tempDir();
+  try {
+    const args = benchmark.withWorkdir(root, { q: "thermal printer", limit: 10 });
+
+    assert.deepEqual(args, {
+      workdir: path.resolve(root),
+      q: "thermal printer",
+      limit: 10,
+    });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("benchmark and experiment CLIs accept explicit workdir paths", () => {
+  const root = tempDir();
+  try {
+    assert.deepEqual(benchmark.parseArgs(["--workdir", root, "--json"]), {
+      workdir: root,
+      json: true,
+    });
+
+    assert.deepEqual(experiment.parseArgs(["--config", "experiments/demo/config.json", "--workdir", root]), {
+      config: "experiments/demo/config.json",
+      workdir: root,
+    });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

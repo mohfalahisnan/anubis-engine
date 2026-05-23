@@ -731,15 +731,17 @@ async function runBenchmark(options = {}) {
   const runRoot = fs.mkdtempSync(path.join(os.tmpdir(), "anubis-benchmark-run-"));
   const dbPath = path.join(runRoot, "anubis-benchmark.db");
   const ftsPath = path.join(runRoot, "fts_index");
+  const workdirsRoot = path.join(runRoot, "workdirs");
 
   let client;
   try {
     const dataset = generateDataset(scratchRoot, { scale: options.scale });
+    const workdir = resolveBenchmarkWorkdir(options.workdir, dataset);
     if (options.generateOnly) {
       return {
         dataset,
         report: null,
-        summary: { generatedOnly: true },
+        summary: { generatedOnly: true, workdir },
       };
     }
 
@@ -763,11 +765,11 @@ async function runBenchmark(options = {}) {
     const bootstrapMs = nowMs() - bootstrapStart;
 
     const indexStart = nowMs();
-    await callTool(client, "anubis_index_folder", { path: dataset.rootDir });
+    await callTool(client, "anubis_index_folder", withWorkdir(workdir, { path: dataset.rootDir }));
     const indexMs = nowMs() - indexStart;
 
-    const stats = await callTool(client, "anubis_get_index_stats", {});
-    const docs = await callTool(client, "anubis_list_documents", {});
+    const stats = await callTool(client, "anubis_get_index_stats", withWorkdir(workdir));
+    const docs = await callTool(client, "anubis_list_documents", withWorkdir(workdir));
 
     const searchReports = [];
     const queryLatencies = [];
@@ -777,6 +779,7 @@ async function runBenchmark(options = {}) {
     for (const testCase of QUERY_CASES) {
       const queryStart = nowMs();
       const results = await callTool(client, "anubis_search", {
+        workdir,
         q: testCase.query,
         limit: 10,
         depth: 2,
@@ -792,11 +795,12 @@ async function runBenchmark(options = {}) {
       });
     }
 
-    const graphCheck = await evaluateGraphCheck(client, resultCache.get("atlas incident anchor") || []);
+    const graphCheck = await evaluateGraphCheck(client, resultCache.get("atlas incident anchor") || [], workdir);
     const downrankCheck = evaluateDownrank(resultCache.get("active module listing") || []);
-    const jsonCheck = await evaluateJsonChunking(client, docs);
+    const jsonCheck = await evaluateJsonChunking(client, docs, workdir);
     const criticalFailureDiagnostics = debug.includeCriticalFailureDiagnostics
       ? await buildCriticalFailureDiagnostics(client, {
+          workdir,
           docs,
           searchReports,
           resultCache,
@@ -832,11 +836,15 @@ async function runBenchmark(options = {}) {
     const avgLatencyMs =
       queryLatencies.reduce((sum, value) => sum + value, 0) / Math.max(1, queryLatencies.length);
 
-    const dbSizeBytes = fileSizeIfExists(dbPath);
+    const benchmarkStorageDir = resolveBenchmarkStorageDir(workdirsRoot);
+    const actualDbPath = benchmarkStorageDir ? path.join(benchmarkStorageDir, "anubis.db") : dbPath;
+    const dbSizeBytes = fileSizeIfExists(actualDbPath);
     const graphMetrics = graphMetricsFromStats(stats);
     const summary = {
       bootstrapMs: Math.round(bootstrapMs),
-      dbPath,
+      workdir,
+      workdirsRoot,
+      dbPath: actualDbPath,
       dbSizeBytes,
       preprocess: dataset.preprocessPlan,
       indexMs: Math.round(indexMs),
@@ -890,13 +898,14 @@ async function runBenchmark(options = {}) {
   }
 }
 
-async function evaluateGraphCheck(client, anchorResults) {
+async function evaluateGraphCheck(client, anchorResults, workdir) {
   const seed = anchorResults.find((result) => /syslog_03\.txt|shipping_module\.md/.test(result.filename));
   if (!seed) {
     return { status: "FAIL", reason: "anchor query did not return a syslog/shipping seed" };
   }
 
   const neighborhood = await callTool(client, "anubis_get_graph_neighborhood", {
+    workdir,
     chunk_id: seed.chunk_id,
     depth: 2,
     limit: 160,
@@ -936,10 +945,14 @@ async function buildCriticalFailureDiagnostics(client, options) {
     const expectedDocs = docs.filter((doc) => relevant.has(doc.filename));
     const chunksByDocId = new Map();
     for (const doc of expectedDocs) {
-      const chunkResult = await callTool(client, "anubis_get_doc_chunks", { doc_id: doc.id });
+      const chunkResult = await callTool(client, "anubis_get_doc_chunks", {
+        workdir: options.workdir,
+        doc_id: doc.id,
+      });
       chunksByDocId.set(doc.id, chunkResult.chunks || []);
     }
     const diagnosticResults = await callTool(client, "anubis_search", {
+      workdir: options.workdir,
       q: testCase.query,
       limit: Math.min(Math.max(options.candidateLimit || 50, 10), 50),
       depth: 2,
@@ -979,13 +992,13 @@ function evaluateDownrank(results) {
     : { status: "FAIL", reason: "reference document ranked above content module" };
 }
 
-async function evaluateJsonChunking(client, docsResult) {
+async function evaluateJsonChunking(client, docsResult, workdir) {
   const docs = docsResult.documents || [];
   const doc = docs.find((item) => item.filename === "inventory_audit.json");
   if (!doc) {
     return { status: "FAIL", reason: "inventory_audit.json was not indexed" };
   }
-  const chunkResult = await callTool(client, "anubis_get_doc_chunks", { doc_id: doc.id });
+  const chunkResult = await callTool(client, "anubis_get_doc_chunks", { workdir, doc_id: doc.id });
   const chunks = chunkResult.chunks || [];
   const item42 = chunks.find((chunk) => chunk.content.includes("audit log item 42"));
   if (!item42) {
@@ -1311,6 +1324,8 @@ function parseArgs(argv) {
       options.bin = argv[++i];
     } else if (arg === "--data-dir") {
       options.dataDir = argv[++i];
+    } else if (arg === "--workdir") {
+      options.workdir = argv[++i];
     } else if (arg === "--keep") {
       options.keepData = true;
     } else if (arg === "--json") {
@@ -1353,6 +1368,7 @@ function usage() {
 Options:
   --bin <path>        Path to anubis-engine binary. Defaults to target debug/release binary.
   --data-dir <path>   Dataset directory. Defaults to scratch/temp_benchmark_data.
+  --workdir <path>    Workdir passed to MCP tools. Defaults to the generated dataset directory.
   --keep              Keep generated dataset after the run.
   --json              Print JSON summary instead of the text report.
   --debug             Include benchmark-only score breakdowns in report/JSON.
@@ -1418,6 +1434,33 @@ function fileSizeIfExists(file) {
   }
 }
 
+function resolveBenchmarkWorkdir(explicit, dataset) {
+  return path.resolve(explicit || dataset.rootDir);
+}
+
+function withWorkdir(workdir, args = {}) {
+  if (!workdir || typeof workdir !== "string") {
+    throw new Error("workdir must be a non-empty string");
+  }
+  return { ...(args || {}), workdir: path.resolve(workdir) };
+}
+
+function resolveBenchmarkStorageDir(workdirsRoot) {
+  try {
+    const entries = fs
+      .readdirSync(workdirsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(workdirsRoot, entry.name))
+      .filter((dir) => fs.existsSync(path.join(dir, "anubis.db")));
+    if (entries.length === 0) {
+      return null;
+    }
+    return entries.sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs)[0];
+  } catch (_) {
+    return null;
+  }
+}
+
 if (require.main === module) {
   (async () => {
     try {
@@ -1455,8 +1498,12 @@ module.exports = {
   generateDataset,
   graphMetricsFromStats,
   indexingPhaseTimings,
+  parseArgs,
   percentile,
   rankingMetrics,
   resolveEngineBinary,
+  resolveBenchmarkStorageDir,
+  resolveBenchmarkWorkdir,
   runBenchmark,
+  withWorkdir,
 };

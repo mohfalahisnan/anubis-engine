@@ -22,12 +22,17 @@ async function runExperiment(options) {
 
   let benchmarkResult;
   let indexingCrashed = false;
+  const benchmarkWorkdir = resolveExperimentWorkdir(options.workdir || config.workdir, repoRoot);
   try {
-    benchmarkResult = await runBenchmark({
+    const benchmarkOptions = {
       repoRoot,
       scale: suite.scale || "quick",
       debug: config.debug || {},
-    });
+    };
+    if (benchmarkWorkdir) {
+      benchmarkOptions.workdir = benchmarkWorkdir;
+    }
+    benchmarkResult = await runBenchmark(benchmarkOptions);
   } catch (error) {
     indexingCrashed = true;
     benchmarkResult = {
@@ -55,6 +60,7 @@ async function runExperiment(options) {
       id: config.id,
       suite: config.suite,
       baseline: config.baseline,
+      workdir: benchmarkResult.summary.workdir || benchmarkWorkdir || null,
       behaviorChange: Boolean(config.behaviorChange),
     },
     decision,
@@ -86,6 +92,13 @@ function readBaseline(repoRoot, baselineName) {
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function resolveExperimentWorkdir(workdir, repoRoot) {
+  if (!workdir) {
+    return undefined;
+  }
+  return path.resolve(repoRoot, workdir);
 }
 
 function baselineToDecisionMetrics(baseline) {
@@ -196,6 +209,8 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--config") {
       options.config = argv[++i];
+    } else if (arg === "--workdir") {
+      options.workdir = argv[++i];
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else if (!options.config && arg.endsWith(".json")) {
@@ -208,11 +223,12 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return `Usage: node bin/experiment.js --config <path>
-       node bin/experiment.js <path>
+  return `Usage: node bin/experiment.js --config <path> [--workdir <path>]
+       node bin/experiment.js <path> [--workdir <path>]
 
 Runs a benchmark experiment, compares it to a baseline, applies production gates,
 and writes result.json, report.txt, and decision.md into experiments/<id>.
+If omitted, workdir defaults to the benchmark-generated dataset directory.
 `;
 }
 
@@ -238,7 +254,9 @@ if (require.main === module) {
 module.exports = {
   applyProductionGates,
   baselineToDecisionMetrics,
+  parseArgs,
   productionGoalChecks,
+  resolveExperimentWorkdir,
   runExperiment,
   summaryToDecisionMetrics,
 };
