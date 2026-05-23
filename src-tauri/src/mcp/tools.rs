@@ -2,7 +2,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::embedder::local;
-use crate::engine::{indexer, state::AppState};
+use crate::engine::indexer;
+use crate::engine::registry::WorkdirRegistry;
 use crate::mcp::protocol::{CallToolResult, ListToolsResult, Tool, ToolContent};
 use crate::query::context_pack::{build_context_pack, ContextPackOpts};
 use crate::query::hybrid::{run_query, QueryOpts};
@@ -17,11 +18,12 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir whose index to query." },
                         "q": { "type": "string", "description": "Search query." },
                         "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
                         "depth": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 }
                     },
-                    "required": ["q"]
+                    "required": ["workdir", "q"]
                 }),
             ),
             tool(
@@ -30,13 +32,14 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir whose index to query." },
                         "q": { "type": "string", "description": "Search query to pack context for." },
                         "budget_tokens": { "type": "integer", "minimum": 1, "maximum": 200000, "default": 6000 },
                         "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
                         "depth": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 },
                         "include_graph": { "type": "boolean", "default": true }
                     },
-                    "required": ["q"]
+                    "required": ["workdir", "q"]
                 }),
             ),
             tool(
@@ -45,9 +48,10 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir to index into." },
                         "path": { "type": "string", "description": "Absolute path to a supported file." }
                     },
-                    "required": ["path"]
+                    "required": ["workdir", "path"]
                 }),
             ),
             tool(
@@ -56,20 +60,33 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir to index into." },
                         "path": { "type": "string", "description": "Absolute path to a folder." }
                     },
-                    "required": ["path"]
+                    "required": ["workdir", "path"]
                 }),
             ),
             tool(
                 "anubis_get_index_stats",
                 "Return document, chunk, entity, and graph counts for the local Anubis index.",
-                json!({ "type": "object", "properties": {} }),
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." }
+                    },
+                    "required": ["workdir"]
+                }),
             ),
             tool(
                 "anubis_list_documents",
                 "List documents currently known to the Anubis index.",
-                json!({ "type": "object", "properties": {} }),
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." }
+                    },
+                    "required": ["workdir"]
+                }),
             ),
             tool(
                 "anubis_get_doc_chunks",
@@ -77,9 +94,10 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." },
                         "doc_id": { "type": "string", "description": "Document id." }
                     },
-                    "required": ["doc_id"]
+                    "required": ["workdir", "doc_id"]
                 }),
             ),
             tool(
@@ -88,10 +106,11 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." },
                         "chunk_id": { "type": "string", "description": "Chunk id." },
                         "depth": { "type": "integer", "minimum": 1, "maximum": 3, "default": 1 }
                     },
-                    "required": ["chunk_id"]
+                    "required": ["workdir", "chunk_id"]
                 }),
             ),
             tool(
@@ -100,8 +119,10 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." },
                         "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 250 }
-                    }
+                    },
+                    "required": ["workdir"]
                 }),
             ),
             tool(
@@ -110,25 +131,41 @@ pub fn list_tools() -> ListToolsResult {
                 json!({
                     "type": "object",
                     "properties": {
+                        "workdir": { "type": "string", "description": "Absolute path to the workdir." },
                         "chunk_id": { "type": "string", "description": "Chunk id." },
                         "depth": { "type": "integer", "minimum": 1, "maximum": 3, "default": 2 },
                         "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 160 }
                     },
-                    "required": ["chunk_id"]
+                    "required": ["workdir", "chunk_id"]
                 }),
             ),
         ],
     }
 }
 
-pub async fn call_tool(state: &AppState, name: &str, arguments: Value) -> CallToolResult {
-    match dispatch(state, name, arguments).await {
+pub async fn call_tool(
+    registry: &std::sync::Arc<WorkdirRegistry>,
+    name: &str,
+    arguments: Value,
+) -> CallToolResult {
+    match dispatch(registry, name, arguments).await {
         Ok(structured) => tool_result(structured),
         Err(message) => error_result(&message),
     }
 }
 
-async fn dispatch(state: &AppState, name: &str, arguments: Value) -> Result<Value, String> {
+async fn dispatch(
+    registry: &std::sync::Arc<WorkdirRegistry>,
+    name: &str,
+    arguments: Value,
+) -> Result<Value, String> {
+    let workdir = string_arg(&arguments, "workdir")?;
+    let (_, state_arc) = registry
+        .get_or_load(&workdir)
+        .await
+        .map_err(|error| error.to_string())?;
+    let state = state_arc.as_ref();
+
     match name {
         "anubis_search" => {
             let q = string_arg(&arguments, "q")?;
@@ -195,8 +232,6 @@ async fn dispatch(state: &AppState, name: &str, arguments: Value) -> Result<Valu
         "anubis_list_documents" => {
             let db = state.db.lock().await;
             let docs = db::list_documents(&db).map_err(|e| e.to_string())?;
-            // Wrap array in an object so MCP clients that expect `record`
-            // for structuredContent don't reject it.
             Ok(json!({ "documents": docs }))
         }
         "anubis_get_doc_chunks" => {
@@ -317,6 +352,23 @@ mod tests {
             assert!(
                 names.contains(&expected),
                 "missing tool {expected}; got {names:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_tool_requires_workdir() {
+        let result = list_tools();
+        for tool in result.tools {
+            let required = tool
+                .inputSchema
+                .get("required")
+                .and_then(|v| v.as_array())
+                .expect("required");
+            assert!(
+                required.iter().any(|v| v == "workdir"),
+                "tool {} missing 'workdir' in required",
+                tool.name
             );
         }
     }

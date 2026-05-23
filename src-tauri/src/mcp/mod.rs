@@ -3,9 +3,10 @@ pub mod tools;
 
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::engine::state::AppState;
+use crate::engine::registry::WorkdirRegistry;
 use protocol::{InitializeResult, JsonRpcError, JsonRpcRequest, JsonRpcResponse, ServerInfo};
 
 fn get_db_path() -> Result<std::path::PathBuf, String> {
@@ -58,7 +59,16 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let fts_path = get_fts_path(&db_path);
+    let _ = get_fts_path; // kept for ANUBIS_FTS_PATH env-var compatibility hook
+    // ANUBIS_DB_PATH overrides where the storage root lives — we treat its
+    // *parent* as the workdirs root so a single ANUBIS_DB_PATH invocation
+    // still resolves to one workdir directory per caller.
+    let workdirs_root = db_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("workdirs");
+    std::fs::create_dir_all(&workdirs_root)?;
 
     let models_dir = db_path
         .parent()
@@ -66,8 +76,7 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     let embedder = crate::engine::state::bootstrap_shared_engines(&models_dir)
         .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
-    let state = AppState::new(&db_path, &fts_path, embedder)
-        .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
+    let registry = Arc::new(WorkdirRegistry::new(workdirs_root, embedder));
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
@@ -83,7 +92,7 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
 
         match serde_json::from_str::<JsonRpcRequest>(req_str) {
             Ok(req) => {
-                if let Some(res) = handle_request(&state, req).await {
+                if let Some(res) = handle_request(&registry, req).await {
                     let out = serde_json::to_string(&res)?;
                     writeln!(stdout, "{}", out)?;
                     stdout.flush()?;
@@ -111,7 +120,10 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpcResponse> {
+async fn handle_request(
+    registry: &Arc<WorkdirRegistry>,
+    req: JsonRpcRequest,
+) -> Option<JsonRpcResponse> {
     let id = req.id.clone().unwrap_or(Value::Null);
     // Ignore notifications (requests without an ID)
     if id.is_null() && req.method != "notifications/initialized" {
@@ -159,7 +171,7 @@ async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpc
             if let Some(params) = req.params {
                 if let Some(name) = params.get("name").and_then(|v| v.as_str()) {
                     let args = params.get("arguments").cloned().unwrap_or(json!({}));
-                    let result = tools::call_tool(state, name, args).await;
+                    let result = tools::call_tool(registry, name, args).await;
                     return Some(JsonRpcResponse {
                         jsonrpc: "2.0".to_string(),
                         id,
