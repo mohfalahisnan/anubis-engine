@@ -1,0 +1,6 @@
+{
+  "id": "client-influencer",
+  "description": "Client/influencer demo-risk suite combining retrieval, explainability, and graph grounding checks.",
+  "scale": "quick",
+  "categories": ["accuracy", "graph", "latency"]
+}

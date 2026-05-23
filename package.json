@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "test": "node --test test/*.test.js",
     "benchmark": "node bin/benchmark.js",
+    "anubis:experiment": "node bin/experiment.js",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

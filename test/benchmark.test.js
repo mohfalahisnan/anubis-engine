@@ -118,3 +118,151 @@ test("evaluateSearchCase caps recall and fails when no relevant file is returned
   assert.equal(miss.recallAtK, 0);
   assert.equal(miss.status, "FAIL");
 });
+
+test("classifyQuery maps recall and precision to research statuses", () => {
+  assert.equal(benchmark.classifyQuery(0, 1), "critical_fail");
+  assert.equal(benchmark.classifyQuery(0.86, 0.45), "strong_pass");
+  assert.equal(benchmark.classifyQuery(0.75, 0.35), "pass");
+  assert.equal(benchmark.classifyQuery(0.6, 0.2), "weak_pass");
+  assert.equal(benchmark.classifyQuery(0.59, 0.9), "fail");
+});
+
+test("evaluateSearchCase includes ranking metrics without changing legacy fields", () => {
+  const result = benchmark.evaluateSearchCase(
+    {
+      label: "ranking",
+      query: "printer",
+      relevantFiles: ["shipping_module.md", "syslog_03.txt"],
+      k: 5,
+    },
+    [
+      { filename: "billing_module.md" },
+      { filename: "shipping_module.md" },
+      { filename: "readme_master.md" },
+      { filename: "syslog_03.txt" },
+      { filename: "catalog_module.md" },
+    ],
+  );
+
+  assert.equal(result.recallAtK, 1);
+  assert.equal(result.precisionAtK, 0.4);
+  assert.equal(result.recallAt5, 1);
+  assert.equal(result.recallAt10, 1);
+  assert.equal(result.precisionAt5, 0.4);
+  assert.equal(result.precisionAt10, 0.2);
+  assert.equal(result.top1Accuracy, 0);
+  assert.equal(result.top3Accuracy, 1);
+  assert.equal(result.mrrAt10, 0.5);
+  assert.equal(result.ndcgAt10, 0.65);
+  assert.equal(result.queryStatus, "pass");
+});
+
+test("ranking metrics do not let duplicate relevant documents inflate nDCG", () => {
+  const metrics = benchmark.rankingMetrics(
+    [
+      { filename: "shipping_module.md" },
+      { filename: "shipping_module.md" },
+      { filename: "shipping_module.md" },
+      { filename: "billing_module.md" },
+    ],
+    new Set(["shipping_module.md"]),
+  );
+
+  assert.equal(metrics.recallAt10, 1);
+  assert.equal(metrics.ndcgAt10, 1);
+});
+
+test("score breakdown debug output is opt-in", () => {
+  const results = [
+    {
+      chunk_id: "chunk-1",
+      doc_id: "doc-1",
+      filename: "shipping_module.md",
+      score: 0.75,
+      score_vec: 0.8,
+      score_bm25: 0.5,
+      score_graph: 0.1,
+      score_entity: 0.2,
+      score_centrality: 0.05,
+    },
+  ];
+
+  assert.equal(benchmark.debugSearchResults(results, { includeScoreBreakdown: false }), undefined);
+
+  const debug = benchmark.debugSearchResults(results, {
+    includeScoreBreakdown: true,
+    includeTopResults: 1,
+  });
+
+  assert.deepEqual(debug[0].scoreBreakdown, {
+    vector: 0.8,
+    bm25: 0.5,
+    graph: 0.1,
+    entity: 0.2,
+    sourceQuality: 0.05,
+    final: 0.75,
+  });
+});
+
+test("graph metrics report existing graph as candidate edges when visibility is not modeled", () => {
+  const metrics = benchmark.graphMetricsFromStats({
+    chunks: 4,
+    graph_edges: 20,
+    edges_by_type: {
+      semantic: 10,
+      shared_anchor: 4,
+      same_doc: 6,
+    },
+  });
+
+  assert.equal(metrics.totalNodes, 4);
+  assert.equal(metrics.totalEdges, 20);
+  assert.equal(metrics.candidateEdges, 20);
+  assert.equal(metrics.visibleEdges, null);
+  assert.equal(metrics.edgesPerChunk, 5);
+  assert.equal(metrics.visibleEdgesPerNode, null);
+  assert.equal(metrics.edgeEvidenceCoverage, 0.2);
+});
+
+test("critical failure count excludes downrank-only diagnostic probes", () => {
+  assert.equal(
+    benchmark.criticalFailureCount([
+      { queryStatus: "critical_fail", category: "downrank" },
+      { queryStatus: "critical_fail", category: "graph" },
+      { queryStatus: "fail", category: "accuracy" },
+    ]),
+    1,
+  );
+});
+
+test("decideExperiment applies safety gates before improvement checks", () => {
+  const before = {
+    aqi: 69.6,
+    recallAt10: 0.89,
+    precisionAt10: 0.22,
+    p95LatencyMs: 377,
+    criticalFailures: 1,
+    permissionLeakage: 0,
+  };
+
+  assert.equal(
+    benchmark.decideExperiment(before, { ...before, precisionAt10: 0.28 }),
+    "keep",
+  );
+  assert.equal(
+    benchmark.decideExperiment(before, { ...before, aqi: 72 }),
+    "keep",
+  );
+  assert.equal(
+    benchmark.decideExperiment(before, { ...before, permissionLeakage: 1, precisionAt10: 0.4 }),
+    "revert",
+  );
+  assert.equal(
+    benchmark.decideExperiment(before, { ...before, recallAt10: 0.85 }),
+    "revert",
+  );
+  assert.equal(
+    benchmark.decideExperiment(before, { ...before, precisionAt10: 0.24 }),
+    "needs_more_data",
+  );
+});

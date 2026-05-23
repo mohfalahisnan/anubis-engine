@@ -1,0 +1,6 @@
+{
+  "id": "quick",
+  "description": "Default smoke-and-signal suite over the generated 52-file mixed corpus.",
+  "scale": "quick",
+  "categories": ["accuracy", "graph", "downrank", "json", "latency", "indexing"]
+}

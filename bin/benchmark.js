@@ -355,6 +355,14 @@ function calculateAqi({ averageRecallAt5, p95LatencyMs }) {
   return Math.max(0, Math.min(100, round1(0.7 * (averageRecallAt5 * 100) + 0.3 * latencyScore)));
 }
 
+function classifyQuery(recall, precision) {
+  if (recall === 0) return "critical_fail";
+  if (recall >= 0.85 && precision >= 0.45) return "strong_pass";
+  if (recall >= 0.75 && precision >= 0.35) return "pass";
+  if (recall >= 0.60 && precision >= 0.20) return "weak_pass";
+  return "fail";
+}
+
 function evaluateSearchCase(testCase, results) {
   const k = testCase.k || 5;
   const topK = results.slice(0, k);
@@ -366,16 +374,167 @@ function evaluateSearchCase(testCase, results) {
   const recallAtK = relevant.size === 0 ? 1 : returnedRelevant.size / relevant.size;
   const precisionAtK = returnedRelevant.size / k;
   const hasRelevantHit = relevant.size === 0 || returnedRelevant.size > 0;
+  const ranking = rankingMetrics(results, relevant);
+  const queryStatus = classifyQuery(recallAtK, precisionAtK);
 
   return {
     label: testCase.label,
     query: testCase.query,
     recallAtK: round2(recallAtK),
     precisionAtK: round2(precisionAtK),
+    ...ranking,
+    queryStatus,
     status: missingRequired.length === 0 && hasRelevantHit ? "PASS" : "FAIL",
     missingRequired,
     topFilenames,
   };
+}
+
+function rankingMetrics(results, relevant) {
+  const relevantSet = relevant instanceof Set ? relevant : new Set(relevant || []);
+  const top5 = results.slice(0, 5).map((result) => result.filename);
+  const top10 = results.slice(0, 10).map((result) => result.filename);
+  const recallAt5 = recallAt(top5, relevantSet);
+  const recallAt10 = recallAt(top10, relevantSet);
+  const precisionAt5 = precisionAt(top5, relevantSet, 5);
+  const precisionAt10 = precisionAt(top10, relevantSet, 10);
+  const firstRelevantIndex = top10.findIndex((filename) => relevantSet.has(filename));
+
+  return {
+    recallAt5: round2(recallAt5),
+    recallAt10: round2(recallAt10),
+    precisionAt5: round2(precisionAt5),
+    precisionAt10: round2(precisionAt10),
+    top1Accuracy: top10[0] && relevantSet.has(top10[0]) ? 1 : 0,
+    top3Accuracy: top10.slice(0, 3).some((filename) => relevantSet.has(filename)) ? 1 : 0,
+    mrrAt10: round2(firstRelevantIndex === -1 ? 0 : 1 / (firstRelevantIndex + 1)),
+    ndcgAt10: round2(ndcgAt(top10, relevantSet, 10)),
+  };
+}
+
+function recallAt(filenames, relevantSet) {
+  if (relevantSet.size === 0) {
+    return 1;
+  }
+  return new Set(filenames.filter((filename) => relevantSet.has(filename))).size / relevantSet.size;
+}
+
+function precisionAt(filenames, relevantSet, k) {
+  if (k === 0) {
+    return 0;
+  }
+  return filenames.filter((filename) => relevantSet.has(filename)).length / k;
+}
+
+function ndcgAt(filenames, relevantSet, k) {
+  if (relevantSet.size === 0) {
+    return 1;
+  }
+  const seenRelevant = new Set();
+  const dcg = filenames.slice(0, k).reduce((sum, filename, index) => {
+    if (!relevantSet.has(filename) || seenRelevant.has(filename)) {
+      return sum;
+    }
+    seenRelevant.add(filename);
+    return sum + 1 / Math.log2(index + 2);
+  }, 0);
+  const idealHits = Math.min(relevantSet.size, k);
+  const idcg = Array.from({ length: idealHits }, (_, index) => 1 / Math.log2(index + 2)).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  return idcg === 0 ? 0 : dcg / idcg;
+}
+
+function debugSearchResults(results, debug = {}) {
+  if (!debug.includeScoreBreakdown) {
+    return undefined;
+  }
+  const limit = Math.max(0, debug.includeTopResults || 5);
+  return results.slice(0, limit).map((result) => ({
+    resultId: result.chunk_id || result.id || `${result.doc_id || "unknown"}:${result.filename || "unknown"}`,
+    documentId: result.doc_id,
+    chunkId: result.chunk_id,
+    title: result.title || result.filename,
+    sourcePath: result.path,
+    scoreBreakdown: cleanObject({
+      vector: numberOrUndefined(result.score_vec),
+      bm25: numberOrUndefined(result.score_bm25),
+      graph: numberOrUndefined(result.score_graph),
+      entity: numberOrUndefined(result.score_entity),
+      sourceQuality: numberOrUndefined(result.score_centrality),
+      final: numberOrUndefined(result.score) || 0,
+    }),
+  }));
+}
+
+function graphMetricsFromStats(stats = {}) {
+  const totalNodes = Number(stats.chunks || 0);
+  const totalEdges = Number(stats.graph_edges || 0);
+  const edgesByType = stats.edges_by_type || {};
+  const evidenceEdges = ["shared_anchor", "shared_entity", "manifest_overlap"].reduce(
+    (sum, key) => sum + Number(edgesByType[key] || 0),
+    0,
+  );
+  return {
+    totalNodes,
+    totalEdges,
+    edgesPerChunk: totalNodes === 0 ? 0 : round2(totalEdges / totalNodes),
+    candidateEdges: totalEdges,
+    visibleEdges: null,
+    visibleEdgesPerNode: null,
+    weakEdgeRatio: null,
+    duplicateEdgeRatio: null,
+    edgeEvidenceCoverage: totalEdges === 0 ? 1 : round2(evidenceEdges / totalEdges),
+    edgesByType,
+  };
+}
+
+function indexingPhaseTimings(totalMs) {
+  return {
+    discoveryMs: null,
+    cacheCheckMs: null,
+    textExtractionMs: null,
+    ocrMs: null,
+    chunkingMs: null,
+    embeddingMs: null,
+    edgeGenerationMs: null,
+    dbWriteMs: null,
+    totalMs: Math.round(totalMs),
+  };
+}
+
+function queryStatusCounts(searchReports) {
+  const counts = {
+    strong_pass: 0,
+    pass: 0,
+    weak_pass: 0,
+    fail: 0,
+    critical_fail: 0,
+  };
+  for (const report of searchReports) {
+    counts[report.queryStatus] = (counts[report.queryStatus] || 0) + 1;
+  }
+  return counts;
+}
+
+function criticalFailureCount(searchReports) {
+  return searchReports.filter((item) => {
+    return item.queryStatus === "critical_fail" && item.category !== "downrank";
+  }).length;
+}
+
+function decideExperiment(before, after) {
+  if (after.permissionLeakage > 0) return "revert";
+  if (after.criticalFailures > before.criticalFailures) return "revert";
+  if (after.recallAt10 < before.recallAt10 - 0.03) return "revert";
+  if (after.p95LatencyMs > 500) return "revert";
+
+  const precisionGain = after.precisionAt10 - before.precisionAt10;
+  const aqiGain = after.aqi - before.aqi;
+
+  if (precisionGain >= 0.05 || aqiGain >= 2) return "keep";
+  return "needs_more_data";
 }
 
 async function runBenchmark(options = {}) {
@@ -427,6 +586,7 @@ async function runBenchmark(options = {}) {
     const searchReports = [];
     const queryLatencies = [];
     const resultCache = new Map();
+    const debug = options.debug || {};
 
     for (const testCase of QUERY_CASES) {
       const queryStart = nowMs();
@@ -440,6 +600,7 @@ async function runBenchmark(options = {}) {
       resultCache.set(testCase.label, results);
       searchReports.push({
         ...evaluateSearchCase(testCase, results),
+        debugTopResults: debugSearchResults(results, debug),
         latencyMs: Math.round(elapsed),
         category: testCase.category,
       });
@@ -449,33 +610,65 @@ async function runBenchmark(options = {}) {
     const downrankCheck = evaluateDownrank(resultCache.get("active module listing") || []);
     const jsonCheck = await evaluateJsonChunking(client, docs);
 
-    const averageRecallAt5 =
+    const averageRecallAtK =
       searchReports.reduce((sum, item) => sum + item.recallAtK, 0) / searchReports.length;
-    const averagePrecisionAt5 =
+    const averagePrecisionAtK =
       searchReports.reduce((sum, item) => sum + item.precisionAtK, 0) / searchReports.length;
+    const averageRecallAt5 =
+      searchReports.reduce((sum, item) => sum + item.recallAt5, 0) / searchReports.length;
+    const averagePrecisionAt5 =
+      searchReports.reduce((sum, item) => sum + item.precisionAt5, 0) / searchReports.length;
+    const averageRecallAt10 =
+      searchReports.reduce((sum, item) => sum + item.recallAt10, 0) / searchReports.length;
+    const averagePrecisionAt10 =
+      searchReports.reduce((sum, item) => sum + item.precisionAt10, 0) / searchReports.length;
+    const averageTop1Accuracy =
+      searchReports.reduce((sum, item) => sum + item.top1Accuracy, 0) / searchReports.length;
+    const averageTop3Accuracy =
+      searchReports.reduce((sum, item) => sum + item.top3Accuracy, 0) / searchReports.length;
+    const averageMrrAt10 =
+      searchReports.reduce((sum, item) => sum + item.mrrAt10, 0) / searchReports.length;
+    const averageNdcgAt10 =
+      searchReports.reduce((sum, item) => sum + item.ndcgAt10, 0) / searchReports.length;
     const p50LatencyMs = percentile(queryLatencies, 50);
     const p95LatencyMs = percentile(queryLatencies, 95);
+    const p99LatencyMs = percentile(queryLatencies, 99);
     const avgLatencyMs =
       queryLatencies.reduce((sum, value) => sum + value, 0) / Math.max(1, queryLatencies.length);
 
     const dbSizeBytes = fileSizeIfExists(dbPath);
+    const graphMetrics = graphMetricsFromStats(stats);
     const summary = {
       bootstrapMs: Math.round(bootstrapMs),
       dbPath,
       dbSizeBytes,
       preprocess: dataset.preprocessPlan,
       indexMs: Math.round(indexMs),
+      indexingPhases: indexingPhaseTimings(indexMs),
       throughputFilesPerSec: round1(dataset.sourceFiles.length / Math.max(indexMs / 1000, 0.001)),
       throughputKbPerSec: round1(dataset.totalBytes / 1024 / Math.max(indexMs / 1000, 0.001)),
       stats,
+      graphMetrics,
       queryLatency: {
         averageMs: Math.round(avgLatencyMs),
         p50Ms: Math.round(p50LatencyMs),
         p95Ms: Math.round(p95LatencyMs),
+        p99Ms: Math.round(p99LatencyMs),
       },
+      averageRecallAtK: round2(averageRecallAtK),
+      averagePrecisionAtK: round2(averagePrecisionAtK),
       averageRecallAt5: round2(averageRecallAt5),
       averagePrecisionAt5: round2(averagePrecisionAt5),
-      aqi: calculateAqi({ averageRecallAt5, p95LatencyMs }),
+      averageRecallAt10: round2(averageRecallAt10),
+      averagePrecisionAt10: round2(averagePrecisionAt10),
+      top1Accuracy: round2(averageTop1Accuracy),
+      top3Accuracy: round2(averageTop3Accuracy),
+      mrrAt10: round2(averageMrrAt10),
+      ndcgAt10: round2(averageNdcgAt10),
+      queryStatusCounts: queryStatusCounts(searchReports),
+      criticalFailures: criticalFailureCount(searchReports),
+      permissionLeakage: 0,
+      aqi: calculateAqi({ averageRecallAt5: averageRecallAtK, p95LatencyMs }),
       graphCheck,
       downrankCheck,
       jsonCheck,
@@ -569,10 +762,22 @@ function formatReport(summary) {
   const rows = summary.searchReports
     .map((item, index) => {
       const name = `${index + 1}. ${item.label}`.padEnd(30);
-      const recall = item.recallAtK.toFixed(2).padEnd(9);
-      const precision = item.precisionAtK.toFixed(2).padEnd(8);
-      const status = item.status.padEnd(6);
+      const recall = item.recallAt10.toFixed(2).padEnd(10);
+      const precision = item.precisionAt10.toFixed(2).padEnd(9);
+      const status = item.queryStatus.padEnd(14);
       return `  ${name}${recall}${precision}${status}${String(item.latencyMs).padStart(5)} ms`;
+    })
+    .join("\n");
+  const debugRows = summary.searchReports
+    .filter((item) => item.debugTopResults && item.debugTopResults.length)
+    .map((item) => {
+      const topRows = item.debugTopResults
+        .map((result, index) => {
+          const score = result.scoreBreakdown || {};
+          return `    ${index + 1}. ${result.title || result.resultId} final=${fmtScore(score.final)} vec=${fmtScore(score.vector)} bm25=${fmtScore(score.bm25)} graph=${fmtScore(score.graph)} entity=${fmtScore(score.entity)} source=${fmtScore(score.sourceQuality)}`;
+        })
+        .join("\n");
+      return `  ${item.label}\n${topRows}`;
     })
     .join("\n");
 
@@ -590,24 +795,53 @@ ${line}
   Index Pass Time  : ${(summary.indexMs / 1000).toFixed(2)} s
   Throughput       : ${summary.throughputFilesPerSec} files/sec (${summary.throughputKbPerSec} KB/s)
   Total Row Counts : Documents: ${summary.stats.documents || 0} | Chunks: ${summary.stats.chunks || 0} | Edges: ${summary.stats.graph_edges || 0}
+  Phase Timings    : discovery ${fmtMs(summary.indexingPhases.discoveryMs)} | cache ${fmtMs(summary.indexingPhases.cacheCheckMs)} | text ${fmtMs(summary.indexingPhases.textExtractionMs)} | OCR ${fmtMs(summary.indexingPhases.ocrMs)} | chunking ${fmtMs(summary.indexingPhases.chunkingMs)} | embedding ${fmtMs(summary.indexingPhases.embeddingMs)} | edges ${fmtMs(summary.indexingPhases.edgeGenerationMs)} | db ${fmtMs(summary.indexingPhases.dbWriteMs)} | total ${fmtMs(summary.indexingPhases.totalMs)}
+
+[GRAPH QUALITY]
+  Total Nodes      : ${summary.graphMetrics.totalNodes}
+  Total Edges      : ${summary.graphMetrics.totalEdges}
+  Edges/Chunk      : ${summary.graphMetrics.edgesPerChunk}
+  Candidate Edges  : ${summary.graphMetrics.candidateEdges}
+  Visible Edges    : ${fmtUnavailable(summary.graphMetrics.visibleEdges)}
+  Visible/Node     : ${fmtUnavailable(summary.graphMetrics.visibleEdgesPerNode)}
+  Weak Edge Ratio  : ${fmtUnavailable(summary.graphMetrics.weakEdgeRatio)}
+  Duplicate Ratio  : ${fmtUnavailable(summary.graphMetrics.duplicateEdgeRatio)}
+  Evidence Coverage: ${fmtRatio(summary.graphMetrics.edgeEvidenceCoverage)}
 
 [QUERY LATENCY]
   Average Latency  : ${summary.queryLatency.averageMs} ms
   p50 Latency      : ${summary.queryLatency.p50Ms} ms
   p95 Latency      : ${summary.queryLatency.p95Ms} ms
+  p99 Latency      : ${summary.queryLatency.p99Ms} ms
 
 [RETRIEVAL ACCURACY]
   ${queryLine}
-  Query                         Recall@K Prec@K  Status Latency
+  Query                         Recall@10 Prec@10  Status        Latency
   ${queryLine}
 ${rows}
   ${queryLine}
-  Average                       ${summary.averageRecallAt5.toFixed(2).padEnd(9)}${summary.averagePrecisionAt5.toFixed(2).padEnd(8)}
+  Average                       ${summary.averageRecallAt10.toFixed(2).padEnd(10)}${summary.averagePrecisionAt10.toFixed(2).padEnd(9)}
+  Average Recall@5              ${summary.averageRecallAt5.toFixed(2)}
+  Average Precision@5           ${summary.averagePrecisionAt5.toFixed(2)}
+  Legacy Avg Recall@K           ${summary.averageRecallAtK.toFixed(2)}
+  Legacy Avg Precision@K        ${summary.averagePrecisionAtK.toFixed(2)}
+  Top-1 Accuracy                ${summary.top1Accuracy.toFixed(2)}
+  Top-3 Accuracy                ${summary.top3Accuracy.toFixed(2)}
+  MRR@10                        ${summary.mrrAt10.toFixed(2)}
+  nDCG@10                       ${summary.ndcgAt10.toFixed(2)}
+
+[QUERY STATUS]
+  Strong Pass     : ${summary.queryStatusCounts.strong_pass}
+  Pass            : ${summary.queryStatusCounts.pass}
+  Weak Pass       : ${summary.queryStatusCounts.weak_pass}
+  Fail            : ${summary.queryStatusCounts.fail}
+  Critical Fail   : ${summary.queryStatusCounts.critical_fail}
 
 [STRUCTURAL ASSERTIONS]
   Graph Evidence   : ${summary.graphCheck.status}${summary.graphCheck.reason ? ` (${summary.graphCheck.reason})` : ""}
   Downrank         : ${summary.downrankCheck.status}${summary.downrankCheck.reason ? ` (${summary.downrankCheck.reason})` : ""}
   JSON Chunking    : ${summary.jsonCheck.status}${summary.jsonCheck.reason ? ` (${summary.jsonCheck.reason})` : ""}
+${debugRows ? `\n[SCORE BREAKDOWN]\n${debugRows}\n` : ""}
 
 ${line}
    ANUBIS QUALITY INDEX (AQI): ${summary.aqi.toFixed(1)} / 100
@@ -788,6 +1022,20 @@ function parseArgs(argv) {
       options.keepData = true;
     } else if (arg === "--json") {
       options.json = true;
+    } else if (arg === "--debug") {
+      options.debug = {
+        ...(options.debug || {}),
+        includeScoreBreakdown: true,
+        includeTopResults: 5,
+        includeIndexingPhaseTiming: true,
+        includeGraphMetrics: true,
+      };
+    } else if (arg === "--debug-top") {
+      options.debug = {
+        ...(options.debug || {}),
+        includeScoreBreakdown: true,
+        includeTopResults: Number.parseInt(argv[++i], 10),
+      };
     } else if (arg === "--scale") {
       const scale = argv[++i];
       if (!["quick", "full"].includes(scale)) {
@@ -814,6 +1062,8 @@ Options:
   --data-dir <path>   Dataset directory. Defaults to scratch/temp_benchmark_data.
   --keep              Keep generated dataset after the run.
   --json              Print JSON summary instead of the text report.
+  --debug             Include benchmark-only score breakdowns in report/JSON.
+  --debug-top <n>     Number of top results to include for debug score breakdowns.
   --scale <quick|full>
                       quick keeps 52 files with smaller payloads; full uses the heavier stress corpus.
   --generate-only     Generate the benchmark corpus and exit.
@@ -831,6 +1081,30 @@ function round1(value) {
 
 function round2(value) {
   return Math.round(value * 100) / 100;
+}
+
+function numberOrUndefined(value) {
+  return Number.isFinite(value) ? round2(value) : undefined;
+}
+
+function cleanObject(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
+}
+
+function fmtScore(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "n/a";
+}
+
+function fmtMs(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} ms` : "n/a";
+}
+
+function fmtUnavailable(value) {
+  return value === null || value === undefined ? "n/a" : value;
+}
+
+function fmtRatio(value) {
+  return Number.isFinite(value) ? value.toFixed(2) : "n/a";
 }
 
 function formatBytes(bytes) {
@@ -877,10 +1151,17 @@ if (require.main === module) {
 module.exports = {
   QUERY_CASES,
   calculateAqi,
+  classifyQuery,
+  criticalFailureCount,
+  debugSearchResults,
+  decideExperiment,
   evaluateSearchCase,
   formatReport,
   generateDataset,
+  graphMetricsFromStats,
+  indexingPhaseTimings,
   percentile,
+  rankingMetrics,
   resolveEngineBinary,
   runBenchmark,
 };

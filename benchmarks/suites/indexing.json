@@ -1,0 +1,6 @@
+{
+  "id": "indexing",
+  "description": "Indexing performance and phase timing suite.",
+  "scale": "quick",
+  "categories": ["indexing"]
+}

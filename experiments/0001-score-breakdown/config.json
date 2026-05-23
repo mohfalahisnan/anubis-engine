@@ -1,0 +1,12 @@
+{
+  "id": "0001-score-breakdown",
+  "suite": "quick",
+  "baseline": "current-alpha-2026-05-23",
+  "debug": {
+    "includeScoreBreakdown": true,
+    "includeTopResults": 5,
+    "includeIndexingPhaseTiming": true,
+    "includeGraphMetrics": true
+  },
+  "behaviorChange": false
+}

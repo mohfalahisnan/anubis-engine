@@ -1,0 +1,6 @@
+{
+  "id": "retrieval",
+  "description": "Retrieval quality suite focused on query ranking metrics and failures.",
+  "scale": "quick",
+  "categories": ["accuracy", "downrank"]
+}

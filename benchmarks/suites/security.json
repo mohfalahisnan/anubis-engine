@@ -1,0 +1,6 @@
+{
+  "id": "security",
+  "description": "Security gate placeholder suite for permission, workspace, deletion, and prompt-injection leakage metrics.",
+  "scale": "quick",
+  "categories": ["security"]
+}

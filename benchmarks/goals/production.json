@@ -1,0 +1,45 @@
+{
+  "aqi": {
+    "target": 85,
+    "hardMinimum": 80
+  },
+  "retrieval": {
+    "recallAt10": 0.92,
+    "precisionAt10": 0.45,
+    "top3Accuracy": 0.8,
+    "mrrAt10": 0.7,
+    "ndcgAt10": 0.75,
+    "criticalFailures": 0
+  },
+  "latency": {
+    "p95Ms": 500,
+    "p99Ms": 900
+  },
+  "graph": {
+    "visibleEdgesPerNodeMax": 15,
+    "candidateEdgesPerNodeMax": 50,
+    "weakEdgeRatioMax": 0.2,
+    "duplicateEdgeRatioMax": 0.02
+  },
+  "indexing": {
+    "textOnlyThroughputKbPerSec": 500,
+    "mixedThroughputKbPerSec": 50,
+    "noChangeReindexMsMax": 3000
+  },
+  "grounding": {
+    "sourceCoverage": 0.95,
+    "edgeEvidenceCoverage": 0.9
+  },
+  "security": {
+    "permissionLeakage": 0,
+    "crossWorkspaceLeakage": 0,
+    "deletedDocLeakage": 0,
+    "promptInjectionCriticalSuccess": 0
+  },
+  "hardGates": {
+    "permissionLeakageMaxAqi": 50,
+    "criticalFailuresMaxAqi": 80,
+    "sourceCoverageBelow80MaxAqi": 75,
+    "indexingCrashMaxAqi": 70
+  }
+}

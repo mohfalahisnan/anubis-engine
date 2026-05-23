@@ -1,0 +1,6 @@
+{
+  "id": "graph",
+  "description": "Graph evidence and graph density suite.",
+  "scale": "quick",
+  "categories": ["graph"]
+}
