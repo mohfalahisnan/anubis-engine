@@ -20,7 +20,7 @@ Allow callers to address multiple independent indexes — one per "workdir" — 
 
 ## User Model
 
-Multi-workdir, addressable per call. Every index/query call carries a `workdir` parameter (an absolute or user-relative directory path). The engine routes the call to that workdir's storage. The frontend tracks one *active* workdir in UI state purely for convenience and to scope visible content — the engine itself never has a notion of "active".
+Multi-workdir, addressable per call. Every index/query call carries a `workdir` parameter: an absolute directory path. Relative paths are rejected (returns `WorkdirError::NotCanonical`) because there is no well-defined CWD context for Tauri commands or MCP tool calls. The engine routes the call to that workdir's storage. The frontend tracks one *active* workdir in UI state purely for convenience and to scope visible content — the engine itself never has a notion of "active".
 
 ## Architecture
 
@@ -71,7 +71,7 @@ state          = registry.get_or_load(id, canonical_path)  // lazy, idempotent
 
 ### Workdir Parameter Shape
 
-A single string field on every relevant call: an absolute or user-relative path to a directory. The engine canonicalizes it before hashing. The directory must exist on disk; if not, returns `WorkdirError::NotFound`. The workdir's storage dir is created lazily.
+A single string field on every relevant call: an absolute path to a directory. The engine canonicalizes it before hashing. Relative paths are rejected. The directory must exist on disk; if not, returns `WorkdirError::NotFound`. The workdir's storage dir is created lazily.
 
 ### Tauri Commands
 
