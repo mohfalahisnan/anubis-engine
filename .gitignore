@@ -15,6 +15,7 @@ gen/schemas/
 models/*/model.onnx
 .fastembed_cache/
 src-tauri/.fastembed_cache/
+.wwebjs_cache/
 
 # OS/Editor
 .DS_Store
