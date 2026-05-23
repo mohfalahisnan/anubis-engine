@@ -62,6 +62,7 @@ async function runExperiment(options) {
     after,
     gatedAqi,
     productionChecks,
+    criticalFailureDiagnostics: benchmarkResult.summary.criticalFailureDiagnostics || [],
     summary: benchmarkResult.summary,
   };
 

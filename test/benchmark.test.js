@@ -235,6 +235,75 @@ test("critical failure count excludes downrank-only diagnostic probes", () => {
   );
 });
 
+test("critical failure diagnostics identify final ranking drops with indexed evidence", () => {
+  const diagnostic = benchmark.buildCriticalFailureDiagnostic({
+    testCase: {
+      label: "invoice approval",
+      query: "VID-APPROVAL-005 invoice approval",
+      relevantFiles: ["img_invoice_02.png"],
+      k: 5,
+    },
+    report: {
+      topFilenames: ["readme_master.md", "video_record_05.mp4"],
+    },
+    docs: [
+      {
+        id: "doc-invoice",
+        filename: "img_invoice_02.png",
+        path: "D:\\bench\\img_invoice_02.png",
+      },
+    ],
+    chunksByDocId: new Map([
+      [
+        "doc-invoice",
+        [
+          {
+            id: "chunk-invoice",
+            doc_id: "doc-invoice",
+            content: "Invoice OCR: VID-APPROVAL-005 invoice approval confirms dock payment evidence.",
+          },
+        ],
+      ],
+    ]),
+    diagnosticResults: [
+      {
+        filename: "readme_master.md",
+        chunk_id: "chunk-readme",
+        doc_id: "doc-readme",
+        score: 0.6,
+        score_bm25: 1,
+        score_vec: 0.9,
+        score_graph: 0,
+        path: "D:\\bench\\readme_master.md",
+      },
+      {
+        filename: "img_invoice_02.png",
+        chunk_id: "chunk-invoice",
+        doc_id: "doc-invoice",
+        score: 0.4,
+        score_bm25: 0,
+        score_vec: 1,
+        score_graph: 0,
+        path: "D:\\bench\\img_invoice_02.png",
+      },
+    ],
+    aliases: ["dock payment evidence"],
+  });
+
+  assert.equal(diagnostic.query, "VID-APPROVAL-005 invoice approval");
+  assert.equal(diagnostic.expectedDocumentsIndexed, true);
+  assert.equal(diagnostic.expectedChunksIndexed, true);
+  assert.equal(diagnostic.expectedChunksContainExactQueryTerms, true);
+  assert.equal(diagnostic.expectedChunksMatchAliasTerms, true);
+  assert.equal(diagnostic.foundInVectorCandidates, true);
+  assert.equal(diagnostic.foundInMergedCandidates, true);
+  assert.equal(diagnostic.foundInFinalTopK, false);
+  assert.equal(diagnostic.droppedAtStage, "final_ranking");
+  assert.equal(diagnostic.likelyCause, "ranking_or_vocabulary_mismatch");
+  assert.equal(diagnostic.expectedEvidence[0].documentId, "doc-invoice");
+  assert.equal(diagnostic.finalMergedTopResults[0].sourcePath, "D:\\bench\\readme_master.md");
+});
+
 test("decideExperiment applies safety gates before improvement checks", () => {
   const before = {
     aqi: 69.6,

@@ -524,6 +524,192 @@ function criticalFailureCount(searchReports) {
   }).length;
 }
 
+function buildCriticalFailureDiagnostic({
+  testCase,
+  report,
+  docs,
+  chunksByDocId,
+  diagnosticResults,
+  aliases = [],
+}) {
+  const docsById = new Map(docs.map((doc) => [doc.id, doc]));
+  const enrichedDiagnosticResults = diagnosticResults.map((result) => ({
+    ...result,
+    path: result.path || docsById.get(result.doc_id)?.path || null,
+  }));
+  const relevantFiles = new Set(testCase.relevantFiles || []);
+  const expectedDocs = docs.filter((doc) => relevantFiles.has(doc.filename));
+  const expectedChunks = expectedDocs.flatMap((doc) => {
+    return (chunksByDocId.get(doc.id) || []).map((chunk) => ({ ...chunk, document: doc }));
+  });
+  const expectedFilenames = new Set(expectedDocs.map((doc) => doc.filename));
+  const exactTerms = queryTerms(testCase.query);
+  const aliasList = Array.isArray(aliases) ? aliases : [];
+  const expectedChunksContainExactQueryTerms = expectedChunks.some((chunk) =>
+    contentContainsTerms(chunk.content, exactTerms),
+  );
+  const aliasMatches = aliasList.filter((alias) =>
+    expectedChunks.some((chunk) => contentContainsTerms(chunk.content, queryTerms(alias))),
+  );
+  const expectedChunksMatchAliasTerms = aliasList.length ? aliasMatches.length > 0 : null;
+
+  const topBm25Candidates = topCandidatesByScore(enrichedDiagnosticResults, "score_bm25");
+  const topVectorCandidates = topCandidatesByScore(enrichedDiagnosticResults, "score_vec");
+  const topGraphCandidates = topCandidatesByScore(enrichedDiagnosticResults, "score_graph");
+  const finalMergedTopResults = candidateSummaries(enrichedDiagnosticResults.slice(0, 10));
+
+  const foundInBm25Candidates = containsExpected(topBm25Candidates, expectedFilenames);
+  const foundInVectorCandidates = containsExpected(topVectorCandidates, expectedFilenames);
+  const foundInGraphCandidates = containsExpected(topGraphCandidates, expectedFilenames);
+  const foundInMergedCandidates = enrichedDiagnosticResults.some((result) => expectedFilenames.has(result.filename));
+  const foundInFinalTopK = (report.topFilenames || []).some((filename) => expectedFilenames.has(filename));
+  const droppedAtStage = inferDroppedAtStage({
+    expectedDocumentsIndexed: expectedDocs.length === relevantFiles.size,
+    expectedChunksIndexed: expectedChunks.length > 0,
+    expectedChunksContainExactQueryTerms,
+    expectedChunksMatchAliasTerms,
+    foundInMergedCandidates,
+    foundInFinalTopK,
+  });
+
+  const notes = [
+    "Raw BM25/vector/graph candidate pools are not exposed by the current MCP API; candidate lists are component-sorted views of the debug diagnostic search result set.",
+  ];
+  if (!aliasList.length) {
+    notes.push("No alias terms configured for this query.");
+  }
+
+  return {
+    query: testCase.query,
+    expectedEvidence: expectedDocs.map((doc) => {
+      const chunks = chunksByDocId.get(doc.id) || [];
+      return {
+        filename: doc.filename,
+        documentId: doc.id,
+        sourcePath: doc.path || null,
+        chunkIds: chunks.map((chunk) => chunk.id),
+        exactQueryTermsFound: chunks.some((chunk) => contentContainsTerms(chunk.content, exactTerms)),
+        aliasTermsFound: aliasList.length
+          ? aliasList.filter((alias) =>
+              chunks.some((chunk) => contentContainsTerms(chunk.content, queryTerms(alias))),
+            )
+          : null,
+      };
+    }),
+    expectedDocumentsIndexed: expectedDocs.length === relevantFiles.size,
+    expectedChunksIndexed: expectedChunks.length > 0,
+    expectedChunksContainExactQueryTerms,
+    expectedChunksMatchAliasTerms,
+    foundInBm25Candidates,
+    foundInVectorCandidates,
+    foundInGraphCandidates,
+    foundInMergedCandidates,
+    foundInFinalTopK,
+    droppedAtStage,
+    likelyCause: likelyCauseForDrop(droppedAtStage, {
+      foundInVectorCandidates,
+      foundInBm25Candidates,
+      foundInGraphCandidates,
+      expectedChunksContainExactQueryTerms,
+    }),
+    topBm25Candidates,
+    topVectorCandidates,
+    topGraphCandidates,
+    finalMergedTopResults,
+    scoreBreakdownForTopCandidates: finalMergedTopResults,
+    filtersDownrankRulesApplied: [
+      "reference_doc_text_signal_multiplier",
+      "low_signal_chunk_text_multiplier",
+      "centrality_relevance_gate",
+      "max_results_per_doc_diversification",
+    ],
+    expectedSourcePaths: expectedDocs.map((doc) => doc.path || null),
+    retrievedSourcePaths: finalMergedTopResults.map((result) => result.sourcePath || null),
+    notes,
+  };
+}
+
+function queryTerms(text) {
+  return Array.from(
+    new Set(
+      String(text || "")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .map((term) => term.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function contentContainsTerms(content, terms) {
+  const normalized = String(content || "").toLowerCase();
+  return terms.every((term) => normalized.includes(term));
+}
+
+function topCandidatesByScore(results, scoreKey, limit = 10) {
+  return candidateSummaries(
+    results
+      .filter((result) => Number(result[scoreKey] || 0) > 0)
+      .slice()
+      .sort((a, b) => Number(b[scoreKey] || 0) - Number(a[scoreKey] || 0))
+      .slice(0, limit),
+  );
+}
+
+function candidateSummaries(results) {
+  return results.map((result) => ({
+    resultId: result.chunk_id || result.id || `${result.doc_id || "unknown"}:${result.filename || "unknown"}`,
+    documentId: result.doc_id,
+    chunkId: result.chunk_id,
+    filename: result.filename,
+    title: result.title || result.filename,
+    sourcePath: result.path || null,
+    scoreBreakdown: cleanObject({
+      vector: numberOrUndefined(result.score_vec),
+      bm25: numberOrUndefined(result.score_bm25),
+      graph: numberOrUndefined(result.score_graph),
+      entity: numberOrUndefined(result.score_entity),
+      sourceQuality: numberOrUndefined(result.score_centrality),
+      final: numberOrUndefined(result.score) || 0,
+    }),
+  }));
+}
+
+function containsExpected(candidates, expectedFilenames) {
+  return candidates.some((candidate) => expectedFilenames.has(candidate.filename));
+}
+
+function inferDroppedAtStage({
+  expectedDocumentsIndexed,
+  expectedChunksIndexed,
+  expectedChunksContainExactQueryTerms,
+  expectedChunksMatchAliasTerms,
+  foundInMergedCandidates,
+  foundInFinalTopK,
+}) {
+  if (!expectedDocumentsIndexed) return "document_indexing";
+  if (!expectedChunksIndexed) return "chunking";
+  if (!expectedChunksContainExactQueryTerms && expectedChunksMatchAliasTerms !== true) {
+    return "content_or_vocabulary";
+  }
+  if (!foundInMergedCandidates) return "candidate_generation";
+  if (!foundInFinalTopK) return "final_ranking";
+  return "none";
+}
+
+function likelyCauseForDrop(stage, signals) {
+  if (stage === "document_indexing" || stage === "chunking") return "indexing_gap";
+  if (stage === "content_or_vocabulary") return "vocabulary_or_extraction_gap";
+  if (stage === "candidate_generation") return "candidate_generation_gap";
+  if (stage === "final_ranking") {
+    if (signals.foundInVectorCandidates && !signals.foundInBm25Candidates) {
+      return "ranking_or_vocabulary_mismatch";
+    }
+    return "ranking_or_diversification";
+  }
+  return "none";
+}
+
 function decideExperiment(before, after) {
   if (after.permissionLeakage > 0) return "revert";
   if (after.criticalFailures > before.criticalFailures) return "revert";
@@ -609,6 +795,16 @@ async function runBenchmark(options = {}) {
     const graphCheck = await evaluateGraphCheck(client, resultCache.get("atlas incident anchor") || []);
     const downrankCheck = evaluateDownrank(resultCache.get("active module listing") || []);
     const jsonCheck = await evaluateJsonChunking(client, docs);
+    const criticalFailureDiagnostics = debug.includeCriticalFailureDiagnostics
+      ? await buildCriticalFailureDiagnostics(client, {
+          docs,
+          searchReports,
+          resultCache,
+          queryCases: QUERY_CASES,
+          aliases: debug.aliases || {},
+          candidateLimit: debug.includeDiagnosticCandidates || 50,
+        })
+      : [];
 
     const averageRecallAtK =
       searchReports.reduce((sum, item) => sum + item.recallAtK, 0) / searchReports.length;
@@ -672,6 +868,7 @@ async function runBenchmark(options = {}) {
       graphCheck,
       downrankCheck,
       jsonCheck,
+      criticalFailureDiagnostics,
       searchReports,
       sourceFileCount: dataset.sourceFiles.length,
       scale: dataset.scale,
@@ -722,6 +919,50 @@ async function evaluateGraphCheck(client, anchorResults) {
     return { status: "FAIL", reason: "shared_anchor edge lacks citation spans" };
   }
   return { status: "PASS", edgeReason: edge.edge_reason };
+}
+
+async function buildCriticalFailureDiagnostics(client, options) {
+  const docs = options.docs.documents || [];
+  const diagnostics = [];
+  for (const report of options.searchReports) {
+    if (report.queryStatus !== "critical_fail" || report.category === "downrank") {
+      continue;
+    }
+    const testCase = options.queryCases.find((item) => item.label === report.label);
+    if (!testCase) {
+      continue;
+    }
+    const relevant = new Set(testCase.relevantFiles || []);
+    const expectedDocs = docs.filter((doc) => relevant.has(doc.filename));
+    const chunksByDocId = new Map();
+    for (const doc of expectedDocs) {
+      const chunkResult = await callTool(client, "anubis_get_doc_chunks", { doc_id: doc.id });
+      chunksByDocId.set(doc.id, chunkResult.chunks || []);
+    }
+    const diagnosticResults = await callTool(client, "anubis_search", {
+      q: testCase.query,
+      limit: Math.min(Math.max(options.candidateLimit || 50, 10), 50),
+      depth: 2,
+    });
+    diagnostics.push(
+      buildCriticalFailureDiagnostic({
+        testCase,
+        report,
+        docs,
+        chunksByDocId,
+        diagnosticResults,
+        aliases: aliasesForQuery(options.aliases, testCase),
+      }),
+    );
+  }
+  return diagnostics;
+}
+
+function aliasesForQuery(aliasMap, testCase) {
+  if (!aliasMap || typeof aliasMap !== "object") {
+    return [];
+  }
+  return aliasMap[testCase.label] || aliasMap[testCase.query] || [];
 }
 
 function evaluateDownrank(results) {
@@ -780,6 +1021,55 @@ function formatReport(summary) {
       return `  ${item.label}\n${topRows}`;
     })
     .join("\n");
+  const criticalFailureRows = (summary.criticalFailureDiagnostics || [])
+    .map((diagnostic) => {
+      const evidence = diagnostic.expectedEvidence
+        .map((item) => {
+          return `    - ${item.filename} doc=${item.documentId || "n/a"} chunks=${item.chunkIds.length} exactTerms=${item.exactQueryTermsFound} aliases=${Array.isArray(item.aliasTermsFound) ? item.aliasTermsFound.join(", ") || "none" : "n/a"} path=${item.sourcePath || "n/a"}`;
+        })
+        .join("\n");
+      const bm25 = diagnostic.topBm25Candidates
+        .slice(0, 5)
+        .map((item, index) => `    ${index + 1}. ${item.filename} final=${fmtScore(item.scoreBreakdown.final)} bm25=${fmtScore(item.scoreBreakdown.bm25)} vec=${fmtScore(item.scoreBreakdown.vector)} graph=${fmtScore(item.scoreBreakdown.graph)} path=${item.sourcePath || "n/a"}`)
+        .join("\n");
+      const vector = diagnostic.topVectorCandidates
+        .slice(0, 5)
+        .map((item, index) => `    ${index + 1}. ${item.filename} final=${fmtScore(item.scoreBreakdown.final)} bm25=${fmtScore(item.scoreBreakdown.bm25)} vec=${fmtScore(item.scoreBreakdown.vector)} graph=${fmtScore(item.scoreBreakdown.graph)} path=${item.sourcePath || "n/a"}`)
+        .join("\n");
+      const graph = diagnostic.topGraphCandidates
+        .slice(0, 5)
+        .map((item, index) => `    ${index + 1}. ${item.filename} final=${fmtScore(item.scoreBreakdown.final)} bm25=${fmtScore(item.scoreBreakdown.bm25)} vec=${fmtScore(item.scoreBreakdown.vector)} graph=${fmtScore(item.scoreBreakdown.graph)} path=${item.sourcePath || "n/a"}`)
+        .join("\n");
+      const merged = diagnostic.finalMergedTopResults
+        .slice(0, 5)
+        .map((item, index) => `    ${index + 1}. ${item.filename} final=${fmtScore(item.scoreBreakdown.final)} bm25=${fmtScore(item.scoreBreakdown.bm25)} vec=${fmtScore(item.scoreBreakdown.vector)} graph=${fmtScore(item.scoreBreakdown.graph)} path=${item.sourcePath || "n/a"}`)
+        .join("\n");
+      return `  Query: ${diagnostic.query}
+  Expected docs indexed : ${diagnostic.expectedDocumentsIndexed}
+  Expected chunks indexed: ${diagnostic.expectedChunksIndexed}
+  Exact query terms      : ${diagnostic.expectedChunksContainExactQueryTerms}
+  Alias terms            : ${fmtUnavailable(diagnostic.expectedChunksMatchAliasTerms)}
+  Found in BM25 view     : ${diagnostic.foundInBm25Candidates}
+  Found in vector view   : ${diagnostic.foundInVectorCandidates}
+  Found in graph view    : ${diagnostic.foundInGraphCandidates}
+  Found in merged view   : ${diagnostic.foundInMergedCandidates}
+  Found in final top K   : ${diagnostic.foundInFinalTopK}
+  Dropped at stage       : ${diagnostic.droppedAtStage}
+  Likely cause           : ${diagnostic.likelyCause}
+  Expected evidence:
+${evidence || "    n/a"}
+  Top BM25 candidates:
+${bm25 || "    n/a"}
+  Top vector candidates:
+${vector || "    n/a"}
+  Top graph candidates:
+${graph || "    n/a"}
+  Final merged top results:
+${merged || "    n/a"}
+  Rules considered       : ${diagnostic.filtersDownrankRulesApplied.join(", ")}
+  Notes                  : ${diagnostic.notes.join(" ")}`;
+    })
+    .join("\n\n");
 
   return `${line}
                       ANUBIS ENGINE BENCHMARK REPORT
@@ -842,6 +1132,7 @@ ${rows}
   Downrank         : ${summary.downrankCheck.status}${summary.downrankCheck.reason ? ` (${summary.downrankCheck.reason})` : ""}
   JSON Chunking    : ${summary.jsonCheck.status}${summary.jsonCheck.reason ? ` (${summary.jsonCheck.reason})` : ""}
 ${debugRows ? `\n[SCORE BREAKDOWN]\n${debugRows}\n` : ""}
+${criticalFailureRows ? `\n[CRITICAL FAILURE DIAGNOSTICS]\n${criticalFailureRows}\n` : ""}
 
 ${line}
    ANUBIS QUALITY INDEX (AQI): ${summary.aqi.toFixed(1)} / 100
@@ -1150,6 +1441,8 @@ if (require.main === module) {
 
 module.exports = {
   QUERY_CASES,
+  buildCriticalFailureDiagnostic,
+  buildCriticalFailureDiagnostics,
   calculateAqi,
   classifyQuery,
   criticalFailureCount,

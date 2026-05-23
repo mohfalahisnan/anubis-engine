@@ -1,4 +1,12 @@
 {
+  "meta": {
+    "name": "anubis-production",
+    "version": 2,
+    "updatedAt": "2026-05-23",
+    "consumer": "bin/experiment.js productionGoalChecks + codex self-improving loop",
+    "contract": "Fields aqi, retrieval, latency, security are read by bin/experiment.js. Do not rename or move them. New fields (baseline, priorities, keepRevertRules, stopCondition, loop) are read by the codex orchestrator."
+  },
+
   "aqi": {
     "target": 85,
     "hardMinimum": 80
@@ -41,5 +49,169 @@
     "criticalFailuresMaxAqi": 80,
     "sourceCoverageBelow80MaxAqi": 75,
     "indexingCrashMaxAqi": 70
+  },
+
+  "baseline": {
+    "ref": "benchmarks/baselines/current-alpha-2026-05-23.json",
+    "lastExperiment": "experiments/0001-score-breakdown",
+    "snapshot": {
+      "aqi": 70.5,
+      "recallAt10": 0.89,
+      "precisionAt10": 0.31,
+      "top3Accuracy": 0.93,
+      "mrrAt10": 0.89,
+      "ndcgAt10": 0.87,
+      "p95LatencyMs": 362,
+      "p99LatencyMs": 362,
+      "criticalFailures": 1,
+      "permissionLeakage": 0,
+      "graphEdgesPerChunk": 71.03,
+      "edgeEvidenceCoverage": 0.04
+    }
+  },
+
+  "priorities": [
+    {
+      "rank": 1,
+      "metric": "retrieval.criticalFailures",
+      "current": 1,
+      "target": 0,
+      "gap": 1,
+      "blocker": "hardGate: caps AQI at 80",
+      "rationale": "One query (invoice approval, VID-APPROVAL-005) returns zero true positives. Until this is fixed, AQI cannot pass the 80 hard cap and production is unreachable."
+    },
+    {
+      "rank": 2,
+      "metric": "retrieval.precisionAt10",
+      "current": 0.31,
+      "target": 0.45,
+      "gap": 0.14,
+      "rationale": "Largest quality gap not yet at production. Score breakdowns show bottom-half of top-10 is graph-only or entity-only hits with weak BM25 / vector signal — candidates for downranking, pruning, or rerank."
+    },
+    {
+      "rank": 3,
+      "metric": "aqi",
+      "current": 70.5,
+      "target": 85,
+      "gap": 14.5,
+      "rationale": "Composite. Moves as #1 and #2 land; do not optimise directly."
+    },
+    {
+      "rank": 4,
+      "metric": "retrieval.recallAt10",
+      "current": 0.89,
+      "target": 0.92,
+      "gap": 0.03,
+      "rationale": "Close — protect, do not regress. Final push only after precision is at target."
+    },
+    {
+      "rank": 5,
+      "metric": "grounding.edgeEvidenceCoverage",
+      "current": 0.04,
+      "target": 0.9,
+      "gap": 0.86,
+      "rationale": "Evidence is computed on read; baseline coverage 4%. Needs evidence persisted on write or a coverage walker before this can move."
+    },
+    {
+      "rank": 6,
+      "metric": "graph.visibleEdgesPerNodeMax",
+      "current": null,
+      "target": 15,
+      "gap": null,
+      "blockedBy": "harness does not yet split candidate vs visible edges",
+      "rationale": "Baseline has 71 edges/chunk and no visibility split. Requires a trusted-graph / candidate-graph separation in both engine and benchmark before this is observable."
+    }
+  ],
+
+  "keepRevertRules": {
+    "revertIfAny": [
+      {
+        "id": "permission-leak",
+        "when": "after.permissionLeakage > 0",
+        "reason": "Security failure — immediate revert (program.md rule 9)."
+      },
+      {
+        "id": "critical-failures-increase",
+        "when": "after.criticalFailures > before.criticalFailures",
+        "reason": "Never regress zero-recall queries."
+      },
+      {
+        "id": "recall-regression",
+        "when": "before.recallAt10 - after.recallAt10 > 0.03",
+        "reason": "Recall is the strongest baseline signal — protect it (program.md rule 3)."
+      },
+      {
+        "id": "latency-regression",
+        "when": "after.p95LatencyMs > 500",
+        "reason": "Hard latency budget (program.md rule 5)."
+      },
+      {
+        "id": "edge-bloat",
+        "when": "after.graphEdges > before.graphEdges && after.precisionAt10 <= before.precisionAt10",
+        "reason": "More edges without precision gain is added noise."
+      }
+    ],
+    "keepIfAny": [
+      {
+        "id": "critical-fix",
+        "when": "after.criticalFailures < before.criticalFailures",
+        "reason": "Closes #1 priority."
+      },
+      {
+        "id": "precision-jump",
+        "when": "(after.precisionAt10 - before.precisionAt10) >= 0.05",
+        "reason": "Direct progress on #2 priority."
+      },
+      {
+        "id": "aqi-jump",
+        "when": "(after.aqi - before.aqi) >= 2",
+        "reason": "Composite improvement worth keeping (matches bin/experiment.js decision logic)."
+      }
+    ],
+    "default": "needs_more_data",
+    "precedence": "revertIfAny > keepIfAny > default"
+  },
+
+  "stopCondition": {
+    "description": "Engine is production-ready when every productionChecks entry from bin/experiment.js passes against the quick suite AND AQI clears 85 without a hard-gate cap.",
+    "allOf": [
+      "productionChecks.aqi.pass",
+      "productionChecks.recallAt10.pass",
+      "productionChecks.precisionAt10.pass",
+      "productionChecks.top3Accuracy.pass",
+      "productionChecks.mrrAt10.pass",
+      "productionChecks.ndcgAt10.pass",
+      "productionChecks.p95LatencyMs.pass",
+      "productionChecks.p99LatencyMs.pass",
+      "productionChecks.criticalFailures.pass",
+      "productionChecks.permissionLeakage.pass",
+      "productionChecks.indexingCrashed.pass",
+      "gatedAqi === after.aqi"
+    ]
+  },
+
+  "loop": {
+    "description": "One iteration of the self-improving benchmark loop. Codex executes this against the current baseline until stopCondition is true.",
+    "iteration": [
+      "Read baseline.snapshot and priorities[]. Pick the highest-rank priority whose target is not met and is not blockedBy harness work.",
+      "Form ONE hypothesis that targets that metric. Verify the hypothesis cannot trigger any revertIfAny rule by construction.",
+      "Scaffold experiments/NNNN-<slug>/ with config.json (suite=quick, baseline=current), experiment.md (hypothesis + change scope), and a single code change.",
+      "Run: npm run anubis:experiment -- experiments/NNNN-<slug>/config.json.",
+      "Apply keepRevertRules to result.json. Persist decision.md and result.json.",
+      "If decision=keep: write new baselines/<name>.json, update meta.updatedAt and baseline.{ref,lastExperiment,snapshot} in this file, recompute priorities[].{current,gap}.",
+      "If decision=revert: leave baseline untouched, mark the hypothesis as tried in the experiment's decision.md, pick the next hypothesis.",
+      "Re-evaluate stopCondition. If all true, halt and report production-ready."
+    ],
+    "constraints": [
+      "One meaningful change per experiment (program.md rule 1).",
+      "Never relax benchmark expectations to pass (rule 2).",
+      "No new dependencies unless necessary (rule 6).",
+      "Every result.json must include score breakdown (rule 7).",
+      "Every graph edge must have evidence or be hidden from the trusted graph (rule 8)."
+    ],
+    "suite": {
+      "default": "quick",
+      "fullPromotion": "Re-run against retrieval + graph + security suites before promoting to baseline when a change touches retrieval scoring, graph construction, or auth/permissions."
+    }
   }
 }

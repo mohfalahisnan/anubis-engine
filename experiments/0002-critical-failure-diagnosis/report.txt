@@ -3,16 +3,16 @@
 ========================================================================
 [SYSTEM INFO]
   Corpus Scale     : quick
-  Bootstrap Time   : 1408 ms
-  Database Path    : C:\Users\User\AppData\Local\Temp\anubis-benchmark-run-SGPwq2\anubis-benchmark.db
-  Database Size    : 11.2 MB
+  Bootstrap Time   : 1313 ms
+  Database Path    : C:\Users\User\AppData\Local\Temp\anubis-benchmark-run-HvGDRh\anubis-benchmark.db
+  Database Size    : 11.1 MB
 
 [INDEXING PERFORMANCE]
   Pre-pass Plan    : 13 files checked, 9 cache hits, 4 expected OCR runs
-  Index Pass Time  : 102.13 s
-  Throughput       : 0.5 files/sec (1.1 KB/s)
+  Index Pass Time  : 79.65 s
+  Throughput       : 0.7 files/sec (1.4 KB/s)
   Total Row Counts : Documents: 52 | Chunks: 417 | Edges: 29618
-  Phase Timings    : discovery n/a | cache n/a | text n/a | OCR n/a | chunking n/a | embedding n/a | edges n/a | db n/a | total 102128 ms
+  Phase Timings    : discovery n/a | cache n/a | text n/a | OCR n/a | chunking n/a | embedding n/a | edges n/a | db n/a | total 79649 ms
 
 [GRAPH QUALITY]
   Total Nodes      : 417
@@ -26,30 +26,30 @@
   Evidence Coverage: 0.04
 
 [QUERY LATENCY]
-  Average Latency  : 303 ms
-  p50 Latency      : 306 ms
-  p95 Latency      : 362 ms
-  p99 Latency      : 362 ms
+  Average Latency  : 333 ms
+  p50 Latency      : 339 ms
+  p95 Latency      : 377 ms
+  p99 Latency      : 377 ms
 
 [RETRIEVAL ACCURACY]
   ----------------------------------------------------------------------
   Query                         Recall@10 Prec@10  Status        Latency
   ----------------------------------------------------------------------
-  1. printer replacement        1.00      0.30     weak_pass       261 ms
-  2. atlas incident anchor      1.00      0.30     pass            330 ms
-  3. active module listing      0.33      0.10     fail            273 ms
-  4. audit item 42              1.00      0.80     weak_pass       303 ms
-  5. payment ledger             1.00      0.30     weak_pass       277 ms
-  6. route optimization         1.00      0.30     weak_pass       230 ms
-  7. slotting reserve           1.00      0.30     weak_pass       312 ms
-  8. webhook retry              1.00      0.30     weak_pass       362 ms
-  9. session token              1.00      0.30     weak_pass       335 ms
-  10. pick pack wave            1.00      0.30     weak_pass       353 ms
-  11. offline scan              1.00      0.30     weak_pass       306 ms
-  12. alert error               1.00      0.10     weak_pass       322 ms
-  13. invoice approval          0.00      0.00     critical_fail   290 ms
-  14. surya node                1.00      0.60     pass            282 ms
-  15. retention audit           1.00      0.30     weak_pass       309 ms
+  1. printer replacement        1.00      0.30     weak_pass       288 ms
+  2. atlas incident anchor      1.00      0.30     pass            360 ms
+  3. active module listing      0.33      0.10     fail            308 ms
+  4. audit item 42              1.00      0.80     weak_pass       354 ms
+  5. payment ledger             1.00      0.30     weak_pass       329 ms
+  6. route optimization         1.00      0.30     weak_pass       271 ms
+  7. slotting reserve           1.00      0.30     weak_pass       325 ms
+  8. webhook retry              1.00      0.30     weak_pass       309 ms
+  9. session token              1.00      0.30     weak_pass       341 ms
+  10. pick pack wave            1.00      0.30     weak_pass       338 ms
+  11. offline scan              1.00      0.30     weak_pass       339 ms
+  12. alert error               1.00      0.10     weak_pass       356 ms
+  13. invoice approval          0.00      0.00     critical_fail   377 ms
+  14. surya node                1.00      0.60     pass            349 ms
+  15. retention audit           1.00      0.30     weak_pass       345 ms
   ----------------------------------------------------------------------
   Average                       0.89      0.31     
   Average Recall@5              0.89
@@ -57,8 +57,8 @@
   Legacy Avg Recall@K           0.89
   Legacy Avg Precision@K        0.22
   Top-1 Accuracy                0.87
-  Top-3 Accuracy                0.93
-  MRR@10                        0.89
+  Top-3 Accuracy                0.87
+  MRR@10                        0.88
   nDCG@10                       0.87
 
 [QUERY STATUS]
@@ -87,15 +87,15 @@
     4. activity_log.csv final=0.59 vec=0.97 bm25=0.00 graph=1.00 entity=0.00 source=0.99
     5. shipping_module.md final=0.52 vec=0.00 bm25=0.70 graph=0.90 entity=1.00 source=0.84
   active module listing
-    1. support_module.md final=1.00 vec=0.98 bm25=0.99 graph=0.92 entity=0.80 source=1.00
+    1. returns_module.md final=1.00 vec=0.98 bm25=0.99 graph=0.93 entity=0.80 source=0.86
     2. auth_module.md final=1.00 vec=1.00 bm25=0.94 graph=0.99 entity=0.80 source=0.89
-    3. inventory_module.md final=1.00 vec=0.99 bm25=0.96 graph=1.00 entity=0.80 source=0.88
-    4. catalog_module.md final=1.00 vec=0.99 bm25=0.94 graph=0.99 entity=0.80 source=0.99
-    5. returns_module.md final=1.00 vec=0.98 bm25=0.99 graph=0.92 entity=0.80 source=0.86
+    3. support_module.md final=1.00 vec=0.98 bm25=0.99 graph=1.00 entity=0.80 source=1.00
+    4. mobile_module.md final=1.00 vec=0.97 bm25=0.99 graph=0.91 entity=0.80 source=0.89
+    5. inventory_module.md final=1.00 vec=0.99 bm25=0.96 graph=0.92 entity=0.80 source=0.88
   audit item 42
     1. inventory_audit.json final=0.88 vec=1.00 bm25=1.00 graph=0.00 entity=0.80 source=0.90
-    2. inventory_audit.json final=0.80 vec=0.97 bm25=0.40 graph=1.00 entity=0.80 source=0.92
-    3. inventory_audit.json final=0.80 vec=0.97 bm25=0.40 graph=0.99 entity=0.80 source=0.92
+    2. inventory_audit.json final=0.80 vec=0.97 bm25=0.40 graph=1.00 entity=0.80 source=0.91
+    3. inventory_audit.json final=0.80 vec=0.97 bm25=0.40 graph=0.99 entity=0.80 source=0.91
     4. activity_log.csv final=0.44 vec=0.98 bm25=0.00 graph=0.00 entity=0.00 source=0.99
     5. activity_log.csv final=0.44 vec=0.96 bm25=0.00 graph=0.00 entity=0.00 source=1.00
   payment ledger
@@ -127,7 +127,7 @@
     2. auth_module.md final=0.85 vec=0.97 bm25=1.00 graph=0.00 entity=0.70 source=0.86
     3. auth_module.md final=0.85 vec=1.00 bm25=0.88 graph=0.00 entity=1.00 source=0.84
     4. inventory_audit.json final=0.56 vec=0.88 bm25=0.00 graph=1.00 entity=0.08 source=0.95
-    5. inventory_audit.json final=0.56 vec=0.88 bm25=0.00 graph=1.00 entity=0.08 source=0.95
+    5. inventory_audit.json final=0.56 vec=0.88 bm25=0.00 graph=0.99 entity=0.08 source=0.95
   pick pack wave
     1. fulfillment_module.md final=0.89 vec=1.00 bm25=1.00 graph=0.00 entity=1.00 source=0.82
     2. fulfillment_module.md final=0.80 vec=0.95 bm25=0.87 graph=0.00 entity=0.65 source=0.93
@@ -166,6 +166,49 @@
     5. inventory_audit.json final=0.56 vec=0.90 bm25=0.00 graph=1.00 entity=0.00 source=0.99
 
 
+[CRITICAL FAILURE DIAGNOSTICS]
+  Query: VID-APPROVAL-005 invoice approval
+  Expected docs indexed : true
+  Expected chunks indexed: false
+  Exact query terms      : false
+  Alias terms            : false
+  Found in BM25 view     : false
+  Found in vector view   : false
+  Found in graph view    : false
+  Found in merged view   : false
+  Found in final top K   : false
+  Dropped at stage       : chunking
+  Likely cause           : indexing_gap
+  Expected evidence:
+    - img_invoice_02.png doc=09d7a5c6-3060-43f3-aebf-21c7c538dec4 chunks=0 exactTerms=false aliases=none path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\img_invoice_02.png
+  Top BM25 candidates:
+    1. readme_master.md final=0.59 bm25=1.00 vec=0.99 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\readme_master.md
+    2. video_record_05.mp4 final=0.73 bm25=0.73 vec=0.98 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_05.mp4
+    3. manifest.json final=0.51 bm25=0.60 vec=0.99 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\manifest.json
+    4. video_record_04.mp4 final=0.59 bm25=0.36 vec=0.97 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_04.mp4
+    5. video_record_03.mp4 final=0.59 bm25=0.36 vec=0.97 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_03.mp4
+  Top vector candidates:
+    1. readme_master.md final=0.59 bm25=1.00 vec=0.99 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\readme_master.md
+    2. inventory_audit.json final=0.59 bm25=0.00 vec=0.99 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+    3. inventory_audit.json final=0.59 bm25=0.00 vec=0.99 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+    4. manifest.json final=0.51 bm25=0.60 vec=0.99 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\manifest.json
+    5. inventory_audit.json final=0.59 bm25=0.00 vec=0.98 graph=0.98 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+  Top graph candidates:
+    1. activity_log.csv final=0.59 bm25=0.00 vec=0.97 graph=1.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+    2. activity_log.csv final=0.59 bm25=0.00 vec=0.97 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+    3. inventory_audit.json final=0.59 bm25=0.00 vec=0.99 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+    4. activity_log.csv final=0.59 bm25=0.00 vec=0.97 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+    5. activity_log.csv final=0.59 bm25=0.00 vec=0.97 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\activity_log.csv
+  Final merged top results:
+    1. video_record_05.mp4 final=0.73 bm25=0.73 vec=0.98 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_05.mp4
+    2. video_record_04.mp4 final=0.59 bm25=0.36 vec=0.97 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_04.mp4
+    3. video_record_03.mp4 final=0.59 bm25=0.36 vec=0.97 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\video_record_03.mp4
+    4. readme_master.md final=0.59 bm25=1.00 vec=0.99 graph=0.00 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\readme_master.md
+    5. inventory_audit.json final=0.59 bm25=0.00 vec=0.99 graph=0.99 path=D:\workspaces\coding\projects\anubis-engine\scratch\temp_benchmark_data\inventory_audit.json
+  Rules considered       : reference_doc_text_signal_multiplier, low_signal_chunk_text_multiplier, centrality_relevance_gate, max_results_per_doc_diversification
+  Notes                  : Raw BM25/vector/graph candidate pools are not exposed by the current MCP API; candidate lists are component-sorted views of the debug diagnostic search result set.
+
+
 ========================================================================
-   ANUBIS QUALITY INDEX (AQI): 70.5 / 100
+   ANUBIS QUALITY INDEX (AQI): 69.6 / 100
 ========================================================================
