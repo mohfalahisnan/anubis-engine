@@ -38,6 +38,8 @@ pub enum EngineError {
     AlreadyIndexing,
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Workdir error: {0}")]
+    Workdir(#[from] crate::engine::workdir::WorkdirError),
 }
 
 pub fn run() {
