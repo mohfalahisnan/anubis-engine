@@ -44,10 +44,10 @@ const LOW_SIGNAL_TEXT_MULTIPLIER: f32 = 0.25;
 
 /// Cap how many results from a single document appear in the top N.
 /// Avoids the "all hits clustered in one doc" failure mode.
-const MAX_RESULTS_PER_DOC: usize = 3;
+const MAX_RESULTS_PER_DOC: usize = 10;
 
 /// Fan-out cap during graph BFS so a hot node doesn't explode the candidate pool.
-const EXPANSION_FANOUT: usize = 8;
+const EXPANSION_FANOUT: usize = 3;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct QueryOpts {
@@ -122,7 +122,12 @@ pub fn final_score(s: &ScoreParts) -> f32 {
     let text_score =
         (W_VEC * s.score_vec + W_BM25 * s.score_bm25) * text_multiplier * low_signal_multiplier;
     let entity_score = W_ENTITY * s.score_entity * low_signal_multiplier;
-    let base = text_score + W_GRAPH * s.score_graph + entity_score;
+    let graph_score = if s.score_bm25 > 0.0 || s.score_entity > 0.0 {
+        W_GRAPH * s.score_graph
+    } else {
+        0.0
+    };
+    let base = text_score + graph_score + entity_score;
     let centrality_bonus = if s.relevance() >= CENTRALITY_RELEVANCE_GATE {
         W_CENTRALITY_TIEBREAK * s.score_centrality
     } else {
@@ -810,6 +815,22 @@ mod tests {
     }
 
     #[test]
+    fn graph_boost_requires_lexical_or_entity_signal() {
+        let vector_only_neighbor = ScoreParts {
+            chunk_id: "activity-log".into(),
+            score_bm25: 0.0,
+            score_vec: 0.9,
+            score_graph: 1.0,
+            score_entity: 0.0,
+            score_centrality: 0.0,
+            doc_class: None,
+            chunk_signal: None,
+        };
+
+        assert!((final_score(&vector_only_neighbor) - 0.36).abs() < 1e-6);
+    }
+
+    #[test]
     fn hub_cannot_outrank_a_precise_match() {
         // Real-world scenario: README-style hub vs a focused chunk.
         let hub = ScoreParts {
@@ -874,6 +895,55 @@ mod tests {
             .collect();
         assert!(docs.contains(&"doc-a"));
         assert!(docs.contains(&"doc-b"));
+    }
+
+    #[test]
+    fn default_doc_cap_allows_top10_same_doc_when_scores_are_strongest() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed_kb(&mut conn);
+        conn.execute_batch(
+            r#"
+            INSERT INTO chunks (id,doc_id,chunk_index,content,char_start,char_end,created_at)
+            VALUES
+              ('a3','doc-a',2,'printer replacement detail',0,26,'2026-05-21T00:00:00Z'),
+              ('a4','doc-a',3,'printer replacement followup',0,26,'2026-05-21T00:00:00Z'),
+              ('a5','doc-a',4,'printer replacement appendix',0,27,'2026-05-21T00:00:00Z');
+            "#,
+        )
+        .unwrap();
+
+        let scores = vec![
+            ScoreParts {
+                score_vec: 1.0,
+                ..ScoreParts::new("a1".into())
+            },
+            ScoreParts {
+                score_vec: 0.99,
+                ..ScoreParts::new("a2".into())
+            },
+            ScoreParts {
+                score_vec: 0.98,
+                ..ScoreParts::new("a3".into())
+            },
+            ScoreParts {
+                score_vec: 0.97,
+                ..ScoreParts::new("a4".into())
+            },
+            ScoreParts {
+                score_vec: 0.96,
+                ..ScoreParts::new("a5".into())
+            },
+            ScoreParts {
+                score_vec: 0.5,
+                ..ScoreParts::new("b1".into())
+            },
+        ];
+
+        let chosen = diversify_per_doc(&conn, scores, 5, MAX_RESULTS_PER_DOC).unwrap();
+        let ids: Vec<&str> = chosen.iter().map(|score| score.chunk_id.as_str()).collect();
+
+        assert_eq!(ids, vec!["a1", "a2", "a3", "a4", "a5"]);
     }
 
     #[test]
@@ -1004,5 +1074,41 @@ mod tests {
         let ids: Vec<String> = expansion.into_iter().map(|(id, _)| id).collect();
 
         assert_eq!(ids, vec!["c4".to_string()]);
+    }
+
+    #[test]
+    fn graph_expansion_caps_fanout_to_three_strong_neighbors() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed_kb(&mut conn);
+        conn.execute(
+            "INSERT INTO documents (id,path,filename,format,size_bytes,hash,indexed_at,status)
+             VALUES ('doc-c','c.md','c.md','md',1,'h','2026-05-21T00:00:00Z','indexed')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO chunks (id,doc_id,chunk_index,content,char_start,char_end,created_at)
+            VALUES
+              ('c1','doc-c',0,'anchor neighbor one',0,19,'2026-05-21T00:00:00Z'),
+              ('c2','doc-c',1,'anchor neighbor two',0,19,'2026-05-21T00:00:00Z'),
+              ('c3','doc-c',2,'anchor neighbor three',0,21,'2026-05-21T00:00:00Z'),
+              ('c4','doc-c',3,'anchor neighbor four',0,20,'2026-05-21T00:00:00Z');
+            INSERT INTO graph_edges (src_chunk,dst_chunk,weight,edge_type)
+            VALUES
+              ('a1','c1',0.95,'shared_anchor'),
+              ('a1','c2',0.94,'shared_anchor'),
+              ('a1','c3',0.93,'shared_anchor'),
+              ('a1','c4',0.92,'shared_anchor');
+            "#,
+        )
+        .unwrap();
+
+        let expansion = expand_via_graph(&conn, &["a1".to_string()], 1).unwrap();
+        let mut ids: Vec<String> = expansion.into_iter().map(|(id, _)| id).collect();
+        ids.sort();
+
+        assert_eq!(ids, vec!["c1", "c2", "c3"]);
     }
 }

@@ -335,3 +335,25 @@ test("decideExperiment applies safety gates before improvement checks", () => {
     "needs_more_data",
   );
 });
+
+test("resolveEngineBinary chooses the newest built binary", () => {
+  const root = tempDir();
+  try {
+    const exe = process.platform === "win32" ? ".exe" : "";
+    const release = path.join(root, "target", "release", `anubis-engine${exe}`);
+    const debug = path.join(root, "target", "debug", `anubis-engine${exe}`);
+    fs.mkdirSync(path.dirname(release), { recursive: true });
+    fs.mkdirSync(path.dirname(debug), { recursive: true });
+    fs.writeFileSync(release, "old release");
+    fs.writeFileSync(debug, "new debug");
+
+    const oldTime = new Date("2026-05-23T00:00:00Z");
+    const newTime = new Date("2026-05-23T01:00:00Z");
+    fs.utimesSync(release, oldTime, oldTime);
+    fs.utimesSync(debug, newTime, newTime);
+
+    assert.equal(benchmark.resolveEngineBinary(null, root), debug);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

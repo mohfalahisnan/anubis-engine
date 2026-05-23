@@ -6,7 +6,6 @@
     "consumer": "bin/experiment.js productionGoalChecks + codex self-improving loop",
     "contract": "Fields aqi, retrieval, latency, security are read by bin/experiment.js. Do not rename or move them. New fields (baseline, priorities, keepRevertRules, stopCondition, loop) are read by the codex orchestrator."
   },
-
   "aqi": {
     "target": 85,
     "hardMinimum": 80
@@ -50,58 +49,56 @@
     "sourceCoverageBelow80MaxAqi": 75,
     "indexingCrashMaxAqi": 70
   },
-
   "baseline": {
-    "ref": "benchmarks/baselines/current-alpha-2026-05-23.json",
-    "lastExperiment": "experiments/0001-score-breakdown",
+    "ref": "benchmarks/baselines/current-alpha-2026-05-23-0012-doc-cap-after-fanout.json",
+    "lastExperiment": "experiments/0012-doc-cap-after-fanout",
     "snapshot": {
-      "aqi": 70.5,
-      "recallAt10": 0.89,
-      "precisionAt10": 0.31,
+      "aqi": 81,
+      "recallAt10": 0.96,
+      "precisionAt10": 0.38,
       "top3Accuracy": 0.93,
-      "mrrAt10": 0.89,
-      "ndcgAt10": 0.87,
-      "p95LatencyMs": 362,
-      "p99LatencyMs": 362,
-      "criticalFailures": 1,
+      "mrrAt10": 0.94,
+      "ndcgAt10": 0.94,
+      "p95LatencyMs": 239,
+      "p99LatencyMs": 239,
+      "criticalFailures": 0,
       "permissionLeakage": 0,
-      "graphEdgesPerChunk": 71.03,
+      "graphEdgesPerChunk": 69.86,
       "edgeEvidenceCoverage": 0.04
     }
   },
-
   "priorities": [
     {
       "rank": 1,
       "metric": "retrieval.criticalFailures",
-      "current": 1,
+      "current": 0,
       "target": 0,
-      "gap": 1,
+      "gap": 0,
       "blocker": "hardGate: caps AQI at 80",
       "rationale": "One query (invoice approval, VID-APPROVAL-005) returns zero true positives. Until this is fixed, AQI cannot pass the 80 hard cap and production is unreachable."
     },
     {
       "rank": 2,
       "metric": "retrieval.precisionAt10",
-      "current": 0.31,
+      "current": 0.38,
       "target": 0.45,
-      "gap": 0.14,
+      "gap": 0.07,
       "rationale": "Largest quality gap not yet at production. Score breakdowns show bottom-half of top-10 is graph-only or entity-only hits with weak BM25 / vector signal — candidates for downranking, pruning, or rerank."
     },
     {
       "rank": 3,
       "metric": "aqi",
-      "current": 70.5,
+      "current": 81,
       "target": 85,
-      "gap": 14.5,
+      "gap": 4,
       "rationale": "Composite. Moves as #1 and #2 land; do not optimise directly."
     },
     {
       "rank": 4,
       "metric": "retrieval.recallAt10",
-      "current": 0.89,
+      "current": 0.96,
       "target": 0.92,
-      "gap": 0.03,
+      "gap": 0,
       "rationale": "Close — protect, do not regress. Final push only after precision is at target."
     },
     {
@@ -122,7 +119,6 @@
       "rationale": "Baseline has 71 edges/chunk and no visibility split. Requires a trusted-graph / candidate-graph separation in both engine and benchmark before this is observable."
     }
   ],
-
   "keepRevertRules": {
     "revertIfAny": [
       {
@@ -171,7 +167,6 @@
     "default": "needs_more_data",
     "precedence": "revertIfAny > keepIfAny > default"
   },
-
   "stopCondition": {
     "description": "Engine is production-ready when every productionChecks entry from bin/experiment.js passes against the quick suite AND AQI clears 85 without a hard-gate cap.",
     "allOf": [
@@ -189,7 +184,6 @@
       "gatedAqi === after.aqi"
     ]
   },
-
   "loop": {
     "description": "One iteration of the self-improving benchmark loop. Codex executes this against the current baseline until stopCondition is true.",
     "iteration": [

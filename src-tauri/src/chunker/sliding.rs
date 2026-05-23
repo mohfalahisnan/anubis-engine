@@ -141,4 +141,27 @@ mod tests {
         assert!(chunks[0].char_end <= 512);
         assert!(chunks[1].content.len() >= 50);
     }
+
+    #[test]
+    fn chunk_document_splits_sub_512_medium_pages() {
+        let text = format!("{}. {}.", "alpha retrieval signal ".repeat(10), "beta retrieval signal ".repeat(10));
+        let doc = crate::types::ParsedDoc {
+            doc_id: "doc-1".to_string(),
+            path: "medium.md".to_string(),
+            format: crate::types::DocFormat::Markdown,
+            pages: vec![crate::types::ParsedPage {
+                page_num: Some(1),
+                text,
+                images: Vec::new(),
+            }],
+            metadata: crate::types::DocMetadata {
+                filename: "medium.md".to_string(),
+                size_bytes: 1,
+                hash: "hash".to_string(),
+            },
+            doc_class: crate::types::DocClass::Content,
+        };
+
+        assert!(super::chunk_document(&doc).len() >= 2);
+    }
 }

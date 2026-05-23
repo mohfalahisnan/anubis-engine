@@ -69,8 +69,8 @@ pub fn is_fresh(source: &Path) -> bool {
 ///
 /// Returns the path that was written so callers can log or pass it on.
 pub fn write_atomic(source: &Path, text: &str) -> std::io::Result<PathBuf> {
-    let final_path = path_for(source)
-        .ok_or_else(|| std::io::Error::other("source has no file stem"))?;
+    let final_path =
+        path_for(source).ok_or_else(|| std::io::Error::other("source has no file stem"))?;
     let dir = final_path
         .parent()
         .ok_or_else(|| std::io::Error::other("sidecar path has no parent"))?;
@@ -113,8 +113,7 @@ fn sidecar_dir_for(source: &Path) -> PathBuf {
 }
 
 fn is_fresh_against(source: &Path, sidecar: &Path) -> bool {
-    let (Ok(src_meta), Ok(car_meta)) =
-        (std::fs::metadata(source), std::fs::metadata(sidecar))
+    let (Ok(src_meta), Ok(car_meta)) = (std::fs::metadata(source), std::fs::metadata(sidecar))
     else {
         return false;
     };
@@ -141,7 +140,8 @@ mod tests {
     }
 
     fn fresh_tmp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("anubis-sidecar-{name}-{}", uuid::Uuid::new_v4()));
+        let dir =
+            std::env::temp_dir().join(format!("anubis-sidecar-{name}-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

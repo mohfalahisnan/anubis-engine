@@ -1,0 +1,41 @@
+{
+  "name": "current-alpha-2026-05-23-0004-newest-engine-binary",
+  "aqi": 74.5,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 420,
+  "edges": 29340,
+  "edgesPerChunk": 69.86,
+  "indexPassTimeSec": 21.98,
+  "throughputFilesPerSec": 2.4,
+  "throughputKbPerSec": 5,
+  "queryLatency": {
+    "averageMs": 322,
+    "p50Ms": 322,
+    "p95Ms": 360,
+    "p99Ms": 360
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.94,
+    "averagePrecisionAtK": 0.24,
+    "recallAt10": 0.98,
+    "precisionAt10": 0.33,
+    "top3Accuracy": 1,
+    "mrrAt10": 1,
+    "ndcgAt10": 0.97,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 0.04,
+    "edgesPerChunk": 69.86
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}

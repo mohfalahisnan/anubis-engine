@@ -1,0 +1,21 @@
+{
+  "id": "0003-image-sidecar-indexing",
+  "suite": "quick",
+  "baseline": "current-alpha-2026-05-23",
+  "debug": {
+    "includeScoreBreakdown": true,
+    "includeTopResults": 5,
+    "includeCriticalFailureDiagnostics": true,
+    "includeDiagnosticCandidates": 50,
+    "includeIndexingPhaseTiming": true,
+    "includeGraphMetrics": true,
+    "aliases": {
+      "invoice approval": [
+        "dock payment evidence",
+        "VID-APPROVAL-005",
+        "invoice approval"
+      ]
+    }
+  },
+  "behaviorChange": true
+}

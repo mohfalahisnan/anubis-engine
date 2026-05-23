@@ -1153,7 +1153,9 @@ function resolveEngineBinary(explicit, repoRoot) {
     path.join(repoRoot, "target", "debug", `anubis-engine${exe}`),
     path.join(repoRoot, "src-tauri", "target", "debug", `anubis-engine${exe}`),
   ];
-  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  const found = candidates
+    .filter((candidate) => fs.existsSync(candidate))
+    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs)[0];
   if (!found) {
     throw new Error(
       `Could not find anubis-engine binary. Build it with "cargo build -p anubis-engine" or pass --bin <path>.`,

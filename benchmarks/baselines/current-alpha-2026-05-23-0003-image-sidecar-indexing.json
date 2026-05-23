@@ -1,0 +1,43 @@
+{
+  "name": "current-alpha-2026-05-23-0003-image-sidecar-indexing",
+  "aqi": 73.1,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 417,
+  "edges": 29618,
+  "edgesPerChunk": 71.03,
+  "indexPassTimeSec": 77.47,
+  "throughputFilesPerSec": 0.7,
+  "throughputKbPerSec": 1.4,
+  "queryLatency": {
+    "averageMs": 281,
+    "p50Ms": 281,
+    "p95Ms": 319,
+    "p99Ms": 319
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.89,
+    "averagePrecisionAtK": 0.22,
+    "recallAt10": 0.89,
+    "precisionAt10": 0.31,
+    "top3Accuracy": 0.87,
+    "mrrAt10": 0.88,
+    "ndcgAt10": 0.87,
+    "criticalFailures": 1,
+    "knownFailureQueries": [
+      "invoice approval"
+    ]
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 0.04,
+    "edgesPerChunk": 71.03
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}
