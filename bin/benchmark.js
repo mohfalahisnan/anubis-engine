@@ -1,0 +1,886 @@
+#!/usr/bin/env node
+
+const { spawn } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const readline = require("node:readline");
+
+const ONE_BY_ONE_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lErp8gAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+const MODULES = [
+  ["shipping_module.md", "Shipping Service", "thermal printer printhead replacement", "SHIP-NODE-SURYA"],
+  ["billing_module.md", "Billing Service", "payment reconciliation ledger", "BILL-CLOSE-224"],
+  ["inventory_module.md", "Inventory Service", "warehouse slotting inventory reserve", "INV-SLOT-090"],
+  ["routing_module.md", "Routing Service", "barcode route optimization dispatch", "ROUTE-KAPPA-118"],
+  ["returns_module.md", "Returns Service", "refund inspection quarantine", "RET-QUEUE-041"],
+  ["notifications_module.md", "Notifications Service", "email webhook retry", "NOTIFY-EDGE-077"],
+  ["auth_module.md", "Auth Service", "session refresh token", "AUTH-GATE-302"],
+  ["catalog_module.md", "Catalog Service", "product variant enrichment", "CAT-MERGE-615"],
+  ["orders_module.md", "Orders Service", "order allocation promise", "ORDER-PROMISE-026"],
+  ["fulfillment_module.md", "Fulfillment Service", "pick pack wave", "FULFILL-WAVE-404"],
+  ["analytics_module.md", "Analytics Service", "forecast dashboard anomaly", "ANALYTICS-CUBE-512"],
+  ["search_module.md", "Search Service", "semantic ranking facet", "SEARCH-FACET-931"],
+  ["support_module.md", "Support Service", "case escalation SLA", "SUPPORT-SLA-733"],
+  ["mobile_module.md", "Mobile Service", "offline scan sync", "MOBILE-SCAN-188"],
+  ["compliance_module.md", "Compliance Service", "retention policy audit", "COMP-AUDIT-640"],
+];
+
+const QUERY_CASES = [
+  {
+    label: "printer replacement",
+    query: "thermal printer printhead replacement",
+    relevantFiles: ["shipping_module.md"],
+    k: 3,
+    mustIncludeTopK: ["shipping_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "atlas incident anchor",
+    query: "INC-2026-ATLAS-014",
+    relevantFiles: ["syslog_03.txt", "shipping_module.md"],
+    k: 5,
+    mustIncludeTopK: ["syslog_03.txt", "shipping_module.md"],
+    category: "graph",
+  },
+  {
+    label: "active module listing",
+    query: "active module listing",
+    relevantFiles: ["shipping_module.md", "billing_module.md", "inventory_module.md"],
+    k: 5,
+    category: "downrank",
+  },
+  {
+    label: "audit item 42",
+    query: "audit log item 42",
+    relevantFiles: ["inventory_audit.json"],
+    k: 5,
+    mustIncludeTopK: ["inventory_audit.json"],
+    category: "json",
+  },
+  {
+    label: "payment ledger",
+    query: "payment reconciliation ledger",
+    relevantFiles: ["billing_module.md"],
+    k: 5,
+    mustIncludeTopK: ["billing_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "route optimization",
+    query: "barcode route optimization dispatch",
+    relevantFiles: ["routing_module.md"],
+    k: 5,
+    mustIncludeTopK: ["routing_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "slotting reserve",
+    query: "warehouse slotting inventory reserve",
+    relevantFiles: ["inventory_module.md"],
+    k: 5,
+    mustIncludeTopK: ["inventory_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "webhook retry",
+    query: "email webhook retry notification",
+    relevantFiles: ["notifications_module.md"],
+    k: 5,
+    mustIncludeTopK: ["notifications_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "session token",
+    query: "session refresh token auth gate",
+    relevantFiles: ["auth_module.md"],
+    k: 5,
+    mustIncludeTopK: ["auth_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "pick pack wave",
+    query: "pick pack wave fulfillment",
+    relevantFiles: ["fulfillment_module.md"],
+    k: 5,
+    mustIncludeTopK: ["fulfillment_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "offline scan",
+    query: "offline scan sync mobile",
+    relevantFiles: ["mobile_module.md"],
+    k: 5,
+    mustIncludeTopK: ["mobile_module.md"],
+    category: "accuracy",
+  },
+  {
+    label: "alert error",
+    query: "ALERT conveyor thermal threshold",
+    relevantFiles: ["syslog_07.txt"],
+    k: 5,
+    category: "accuracy",
+  },
+  {
+    label: "invoice approval",
+    query: "VID-APPROVAL-005 invoice approval",
+    relevantFiles: ["img_invoice_02.png"],
+    k: 5,
+    category: "graph",
+  },
+  {
+    label: "surya node",
+    query: "SHIP-NODE-SURYA cooling lane",
+    relevantFiles: ["shipping_module.md", "inventory_audit.json"],
+    k: 5,
+    category: "graph",
+  },
+  {
+    label: "retention audit",
+    query: "retention policy audit compliance",
+    relevantFiles: ["compliance_module.md"],
+    k: 5,
+    mustIncludeTopK: ["compliance_module.md"],
+    category: "accuracy",
+  },
+];
+
+function generateDataset(rootDir, options = {}) {
+  const scale = options.scale === "full" ? "full" : "quick";
+  fs.rmSync(rootDir, { recursive: true, force: true });
+  fs.mkdirSync(rootDir, { recursive: true });
+
+  const sourceFiles = [];
+  const mediaFiles = [];
+  const freshSidecars = [];
+  const staleOrMissingSidecars = [];
+
+  function writeTextFile(name, text) {
+    const file = path.join(rootDir, name);
+    fs.writeFileSync(file, text, "utf8");
+    sourceFiles.push(file);
+    return file;
+  }
+
+  writeTextFile("inventory_audit.json", JSON.stringify(buildInventoryAudit(scale), null, 2));
+  writeTextFile("activity_log.csv", buildActivityLogCsv(scale));
+
+  for (const [filename, title, phrase, anchor] of MODULES) {
+    writeTextFile(filename, moduleMarkdown(title, phrase, anchor, filename, scale));
+  }
+
+  for (let i = 1; i <= 20; i += 1) {
+    const name = `syslog_${String(i).padStart(2, "0")}.txt`;
+    writeTextFile(name, syslogText(i));
+  }
+
+  for (let i = 1; i <= 8; i += 1) {
+    const filename = `img_invoice_${String(i).padStart(2, "0")}.png`;
+    const file = path.join(rootDir, filename);
+    fs.writeFileSync(file, ONE_BY_ONE_PNG);
+    sourceFiles.push(file);
+    mediaFiles.push(file);
+
+    const sidecar = sidecarPath(file);
+    if (i <= 4) {
+      const text =
+        i === 2
+          ? `${"Invoice OCR: VID-APPROVAL-005 invoice approval confirms dock payment evidence. ".repeat(8)}`
+          : `Invoice OCR: cached invoice ${i} references dock receipt INV-CACHED-${String(i).padStart(3, "0")}.`;
+      fs.writeFileSync(sidecar, text, "utf8");
+      setRelativeMtime(file, sidecar, 10);
+      freshSidecars.push(sidecar);
+    } else if (i <= 6) {
+      fs.writeFileSync(sidecar, `Stale OCR sidecar for invoice ${i}.`, "utf8");
+      setRelativeMtime(file, sidecar, -10);
+      staleOrMissingSidecars.push(sidecar);
+    } else {
+      staleOrMissingSidecars.push(sidecar);
+    }
+  }
+
+  for (let i = 1; i <= 5; i += 1) {
+    const filename = `video_record_${String(i).padStart(2, "0")}.mp4`;
+    const file = path.join(rootDir, filename);
+    fs.writeFileSync(file, Buffer.from(`mock mp4 ${i}\n`));
+    sourceFiles.push(file);
+    mediaFiles.push(file);
+
+    const sidecar = sidecarPath(file);
+    fs.writeFileSync(
+      sidecar,
+      `Whisper transcript ${i}: warehouse dispatch note VID-TRANSCRIPT-${String(i).padStart(3, "0")} with package movement timing.`,
+      "utf8",
+    );
+    setRelativeMtime(file, sidecar, 10);
+    freshSidecars.push(sidecar);
+  }
+
+  writeTextFile("readme_master.md", readmeMaster());
+  writeTextFile("manifest.json", JSON.stringify({ files: sourceFiles.map((file) => path.basename(file)) }, null, 2));
+
+  return {
+    rootDir,
+    scale,
+    sourceFiles,
+    mediaFiles,
+    freshSidecars,
+    staleOrMissingSidecars,
+    preprocessPlan: {
+      total: mediaFiles.length,
+      cacheHits: freshSidecars.length,
+      expectedRuns: staleOrMissingSidecars.length,
+    },
+    totalBytes: sourceFiles.reduce((sum, file) => sum + fs.statSync(file).size, 0),
+  };
+}
+
+function buildInventoryAudit(scale) {
+  const noteRepeat = scale === "full" ? 180 : 18;
+  return {
+    generated_at: "2026-05-23T00:00:00Z",
+    corpus: "anubis benchmark inventory audit",
+    records: Array.from({ length: 60 }, (_, i) => {
+      const node = i === 42 ? "SHIP-NODE-SURYA" : `NODE-${String(i).padStart(3, "0")}`;
+      return {
+        audit_id: `AUDIT-${String(i).padStart(4, "0")}`,
+        audit_query_token: `audit log item ${i}`,
+        component: i === 42 ? "thermal cooling lane replacement queue" : `component-${i % 9}`,
+        node,
+        device_status: i % 4 === 0 ? "attention" : "nominal",
+        remediation: i === 42 ? "Inspect SHIP-NODE-SURYA printhead staging sensor." : "Continue monitoring.",
+        notes: "inventory telemetry payload ".repeat(noteRepeat),
+      };
+    }),
+  };
+}
+
+function buildActivityLogCsv(scale) {
+  const rowCount = scale === "full" ? 5000 : 500;
+  const rows = ["log_id,node,severity,message,timestamp"];
+  for (let i = 0; i < rowCount; i += 1) {
+    const node = i % 41 === 0 ? "SHIP-NODE-SURYA" : `NODE-${String(i % 200).padStart(3, "0")}`;
+    const severity = i % 37 === 0 ? "WARN" : "INFO";
+    const message = i % 137 === 0 ? "thermal threshold drift observed" : "regular heartbeat and package scan";
+    rows.push(`LOG-${String(i).padStart(5, "0")},${node},${severity},${message},2026-05-23T${String(i % 24).padStart(2, "0")}:00:00Z`);
+  }
+  return rows.join("\n");
+}
+
+function moduleMarkdown(title, phrase, anchor, filename, scale) {
+  const detailRepeat = scale === "full" ? 45 : 10;
+  const atlasNote =
+    filename === "shipping_module.md"
+      ? "\nIncident resolution: INC-2026-ATLAS-014 was resolved by replacing the thermal printer printhead and recalibrating SHIP-NODE-SURYA cooling lane labels.\n"
+      : "";
+  return `# ${title}
+
+Active module listing: ${title} owns the ${phrase} workflow.
+
+Primary operating phrase: ${phrase}.
+Operational anchor: ${anchor}.
+${atlasNote}
+Runbook:
+- Validate queue depth and recent deployment health.
+- Compare device telemetry with activity_log.csv before escalation.
+- Record outcome in the active module listing for shift handoff.
+
+Detail:
+${(`${phrase} ${anchor} active module listing operational diagnostic paragraph. `).repeat(detailRepeat)}
+`;
+}
+
+function syslogText(i) {
+  if (i === 3) {
+    return [
+      "2026-05-23T03:14:00Z ERROR atlas gateway detected INC-2026-ATLAS-014.",
+      "Thermal printer printhead replacement required before shipping labels can clear.",
+      "Escalate to shipping_module.md for the resolution runbook.",
+    ].join("\n");
+  }
+  if (i === 7) {
+    return [
+      "2026-05-23T07:18:00Z ALERT conveyor thermal threshold exceeded.",
+      "Cooling lane reported sustained heat and operator acknowledgement delay.",
+      "Recommended action: inspect conveyor thermal threshold guard.",
+    ].join("\n");
+  }
+  return [
+    `2026-05-23T${String(i).padStart(2, "0")}:00:00Z INFO node syslog ${i} heartbeat normal.`,
+    `Trace token SYSLOG-${String(i).padStart(2, "0")} package scanner latency nominal.`,
+    "No active incident; retain log for baseline retrieval quality.",
+  ].join("\n");
+}
+
+function readmeMaster() {
+  return `# Benchmark Master README
+
+This reference document is an active module listing that names every service and anchor.
+It intentionally repeats terms from shipping_module.md, billing_module.md, and inventory_module.md
+so the benchmark can verify reference down-ranking.
+
+Reference anchors:
+- VID-APPROVAL-005 appears here as a manifest-style cross-reference.
+- INC-2026-ATLAS-014 is listed here but the resolution belongs in shipping_module.md.
+- SHIP-NODE-SURYA appears here as a reference pointer, not primary evidence.
+`;
+}
+
+function sidecarPath(sourceFile) {
+  const parsed = path.parse(sourceFile);
+  return path.join(parsed.dir, `${parsed.name}.anubis.txt`);
+}
+
+function setRelativeMtime(sourceFile, sidecarFile, deltaSeconds) {
+  const sourceTime = new Date(Date.now() - 60_000);
+  const sidecarTime = new Date(sourceTime.getTime() + deltaSeconds * 1000);
+  fs.utimesSync(sourceFile, sourceTime, sourceTime);
+  fs.utimesSync(sidecarFile, sidecarTime, sidecarTime);
+}
+
+function percentile(values, p) {
+  if (!values.length) {
+    return 0;
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil((p / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
+}
+
+function calculateAqi({ averageRecallAt5, p95LatencyMs }) {
+  const latencyScore = Math.max(0, 100 - p95LatencyMs / 5);
+  return Math.max(0, Math.min(100, round1(0.7 * (averageRecallAt5 * 100) + 0.3 * latencyScore)));
+}
+
+function evaluateSearchCase(testCase, results) {
+  const k = testCase.k || 5;
+  const topK = results.slice(0, k);
+  const topFilenames = topK.map((result) => result.filename);
+  const relevant = new Set(testCase.relevantFiles || []);
+  const returnedRelevant = new Set(topFilenames.filter((filename) => relevant.has(filename)));
+  const required = testCase.mustIncludeTopK || [];
+  const missingRequired = required.filter((filename) => !topFilenames.includes(filename));
+  const recallAtK = relevant.size === 0 ? 1 : returnedRelevant.size / relevant.size;
+  const precisionAtK = returnedRelevant.size / k;
+  const hasRelevantHit = relevant.size === 0 || returnedRelevant.size > 0;
+
+  return {
+    label: testCase.label,
+    query: testCase.query,
+    recallAtK: round2(recallAtK),
+    precisionAtK: round2(precisionAtK),
+    status: missingRequired.length === 0 && hasRelevantHit ? "PASS" : "FAIL",
+    missingRequired,
+    topFilenames,
+  };
+}
+
+async function runBenchmark(options = {}) {
+  const repoRoot = options.repoRoot || path.resolve(__dirname, "..");
+  const scratchRoot = options.dataDir
+    ? path.resolve(options.dataDir)
+    : path.join(repoRoot, "scratch", "temp_benchmark_data");
+  const runRoot = fs.mkdtempSync(path.join(os.tmpdir(), "anubis-benchmark-run-"));
+  const dbPath = path.join(runRoot, "anubis-benchmark.db");
+  const ftsPath = path.join(runRoot, "fts_index");
+
+  let client;
+  try {
+    const dataset = generateDataset(scratchRoot, { scale: options.scale });
+    if (options.generateOnly) {
+      return {
+        dataset,
+        report: null,
+        summary: { generatedOnly: true },
+      };
+    }
+
+    const binPath = resolveEngineBinary(options.bin, repoRoot);
+    const modelCacheDir = defaultAppModelCacheDir(repoRoot);
+    client = new JsonRpcClient(binPath, {
+      ANUBIS_DB_PATH: dbPath,
+      ANUBIS_FTS_PATH: ftsPath,
+      ANUBIS_EMBED_MODELS_DIR: modelCacheDir,
+      ANUBIS_OCR_MODELS_DIR: modelCacheDir,
+    });
+
+    const bootstrapStart = nowMs();
+    await client.start();
+    await client.request("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "anubis-benchmark", version: "1.0.0" },
+    });
+    await client.notify("notifications/initialized", {});
+    const bootstrapMs = nowMs() - bootstrapStart;
+
+    const indexStart = nowMs();
+    await callTool(client, "anubis_index_folder", { path: dataset.rootDir });
+    const indexMs = nowMs() - indexStart;
+
+    const stats = await callTool(client, "anubis_get_index_stats", {});
+    const docs = await callTool(client, "anubis_list_documents", {});
+
+    const searchReports = [];
+    const queryLatencies = [];
+    const resultCache = new Map();
+
+    for (const testCase of QUERY_CASES) {
+      const queryStart = nowMs();
+      const results = await callTool(client, "anubis_search", {
+        q: testCase.query,
+        limit: 10,
+        depth: 2,
+      });
+      const elapsed = nowMs() - queryStart;
+      queryLatencies.push(elapsed);
+      resultCache.set(testCase.label, results);
+      searchReports.push({
+        ...evaluateSearchCase(testCase, results),
+        latencyMs: Math.round(elapsed),
+        category: testCase.category,
+      });
+    }
+
+    const graphCheck = await evaluateGraphCheck(client, resultCache.get("atlas incident anchor") || []);
+    const downrankCheck = evaluateDownrank(resultCache.get("active module listing") || []);
+    const jsonCheck = await evaluateJsonChunking(client, docs);
+
+    const averageRecallAt5 =
+      searchReports.reduce((sum, item) => sum + item.recallAtK, 0) / searchReports.length;
+    const averagePrecisionAt5 =
+      searchReports.reduce((sum, item) => sum + item.precisionAtK, 0) / searchReports.length;
+    const p50LatencyMs = percentile(queryLatencies, 50);
+    const p95LatencyMs = percentile(queryLatencies, 95);
+    const avgLatencyMs =
+      queryLatencies.reduce((sum, value) => sum + value, 0) / Math.max(1, queryLatencies.length);
+
+    const dbSizeBytes = fileSizeIfExists(dbPath);
+    const summary = {
+      bootstrapMs: Math.round(bootstrapMs),
+      dbPath,
+      dbSizeBytes,
+      preprocess: dataset.preprocessPlan,
+      indexMs: Math.round(indexMs),
+      throughputFilesPerSec: round1(dataset.sourceFiles.length / Math.max(indexMs / 1000, 0.001)),
+      throughputKbPerSec: round1(dataset.totalBytes / 1024 / Math.max(indexMs / 1000, 0.001)),
+      stats,
+      queryLatency: {
+        averageMs: Math.round(avgLatencyMs),
+        p50Ms: Math.round(p50LatencyMs),
+        p95Ms: Math.round(p95LatencyMs),
+      },
+      averageRecallAt5: round2(averageRecallAt5),
+      averagePrecisionAt5: round2(averagePrecisionAt5),
+      aqi: calculateAqi({ averageRecallAt5, p95LatencyMs }),
+      graphCheck,
+      downrankCheck,
+      jsonCheck,
+      searchReports,
+      sourceFileCount: dataset.sourceFiles.length,
+      scale: dataset.scale,
+    };
+
+    return {
+      dataset,
+      summary,
+      report: formatReport(summary),
+    };
+  } finally {
+    if (client) {
+      await client.close();
+    }
+    if (!options.keepData) {
+      await rmDirWithRetry(scratchRoot);
+    }
+    await rmDirWithRetry(runRoot);
+  }
+}
+
+async function evaluateGraphCheck(client, anchorResults) {
+  const seed = anchorResults.find((result) => /syslog_03\.txt|shipping_module\.md/.test(result.filename));
+  if (!seed) {
+    return { status: "FAIL", reason: "anchor query did not return a syslog/shipping seed" };
+  }
+
+  const neighborhood = await callTool(client, "anubis_get_graph_neighborhood", {
+    chunk_id: seed.chunk_id,
+    depth: 2,
+    limit: 160,
+  });
+  const nodesById = new Map((neighborhood.nodes || []).map((node) => [node.chunk_id, node]));
+  const edge = (neighborhood.edges || []).find((candidate) => {
+    if (candidate.edge_type !== "shared_anchor" || candidate.edge_reason !== "anchor:INC-2026-ATLAS-014") {
+      return false;
+    }
+    const src = nodesById.get(candidate.src_chunk);
+    const dst = nodesById.get(candidate.dst_chunk);
+    const filenames = [src && src.filename, dst && dst.filename];
+    return filenames.includes("syslog_03.txt") && filenames.includes("shipping_module.md");
+  });
+
+  if (!edge) {
+    return { status: "FAIL", reason: "missing shared_anchor edge for INC-2026-ATLAS-014" };
+  }
+  if (!edge.evidence || !edge.evidence.src_span || !edge.evidence.dst_span) {
+    return { status: "FAIL", reason: "shared_anchor edge lacks citation spans" };
+  }
+  return { status: "PASS", edgeReason: edge.edge_reason };
+}
+
+function evaluateDownrank(results) {
+  const readmeIndex = results.findIndex((result) => result.filename === "readme_master.md");
+  const contentIndex = results.findIndex((result) => result.filename && result.filename.endsWith("_module.md"));
+  if (contentIndex === -1) {
+    return { status: "FAIL", reason: "no content module returned" };
+  }
+  if (readmeIndex === -1) {
+    return { status: "PASS", reason: "reference document did not enter top results" };
+  }
+  return contentIndex < readmeIndex
+    ? { status: "PASS", reason: "content module ranked above reference document" }
+    : { status: "FAIL", reason: "reference document ranked above content module" };
+}
+
+async function evaluateJsonChunking(client, docsResult) {
+  const docs = docsResult.documents || [];
+  const doc = docs.find((item) => item.filename === "inventory_audit.json");
+  if (!doc) {
+    return { status: "FAIL", reason: "inventory_audit.json was not indexed" };
+  }
+  const chunkResult = await callTool(client, "anubis_get_doc_chunks", { doc_id: doc.id });
+  const chunks = chunkResult.chunks || [];
+  const item42 = chunks.find((chunk) => chunk.content.includes("audit log item 42"));
+  if (!item42) {
+    return { status: "FAIL", reason: "audit log item 42 did not appear in any chunk" };
+  }
+  if (chunks.length <= 1) {
+    return { status: "FAIL", reason: "inventory JSON was not split into multiple chunks" };
+  }
+  return { status: "PASS", chunks: chunks.length, page: item42.page };
+}
+
+function formatReport(summary) {
+  const line = "=".repeat(72);
+  const queryLine = "-".repeat(70);
+  const rows = summary.searchReports
+    .map((item, index) => {
+      const name = `${index + 1}. ${item.label}`.padEnd(30);
+      const recall = item.recallAtK.toFixed(2).padEnd(9);
+      const precision = item.precisionAtK.toFixed(2).padEnd(8);
+      const status = item.status.padEnd(6);
+      return `  ${name}${recall}${precision}${status}${String(item.latencyMs).padStart(5)} ms`;
+    })
+    .join("\n");
+
+  return `${line}
+                      ANUBIS ENGINE BENCHMARK REPORT
+${line}
+[SYSTEM INFO]
+  Corpus Scale     : ${summary.scale}
+  Bootstrap Time   : ${summary.bootstrapMs} ms
+  Database Path    : ${summary.dbPath}
+  Database Size    : ${formatBytes(summary.dbSizeBytes)}
+
+[INDEXING PERFORMANCE]
+  Pre-pass Plan    : ${summary.preprocess.total} files checked, ${summary.preprocess.cacheHits} cache hits, ${summary.preprocess.expectedRuns} expected OCR runs
+  Index Pass Time  : ${(summary.indexMs / 1000).toFixed(2)} s
+  Throughput       : ${summary.throughputFilesPerSec} files/sec (${summary.throughputKbPerSec} KB/s)
+  Total Row Counts : Documents: ${summary.stats.documents || 0} | Chunks: ${summary.stats.chunks || 0} | Edges: ${summary.stats.graph_edges || 0}
+
+[QUERY LATENCY]
+  Average Latency  : ${summary.queryLatency.averageMs} ms
+  p50 Latency      : ${summary.queryLatency.p50Ms} ms
+  p95 Latency      : ${summary.queryLatency.p95Ms} ms
+
+[RETRIEVAL ACCURACY]
+  ${queryLine}
+  Query                         Recall@K Prec@K  Status Latency
+  ${queryLine}
+${rows}
+  ${queryLine}
+  Average                       ${summary.averageRecallAt5.toFixed(2).padEnd(9)}${summary.averagePrecisionAt5.toFixed(2).padEnd(8)}
+
+[STRUCTURAL ASSERTIONS]
+  Graph Evidence   : ${summary.graphCheck.status}${summary.graphCheck.reason ? ` (${summary.graphCheck.reason})` : ""}
+  Downrank         : ${summary.downrankCheck.status}${summary.downrankCheck.reason ? ` (${summary.downrankCheck.reason})` : ""}
+  JSON Chunking    : ${summary.jsonCheck.status}${summary.jsonCheck.reason ? ` (${summary.jsonCheck.reason})` : ""}
+
+${line}
+   ANUBIS QUALITY INDEX (AQI): ${summary.aqi.toFixed(1)} / 100
+${line}`;
+}
+
+function resolveEngineBinary(explicit, repoRoot) {
+  if (explicit) {
+    return path.resolve(explicit);
+  }
+  if (process.env.ANUBIS_ENGINE_BIN) {
+    return path.resolve(process.env.ANUBIS_ENGINE_BIN);
+  }
+  const exe = process.platform === "win32" ? ".exe" : "";
+  const candidates = [
+    path.join(repoRoot, "target", "release", `anubis-engine${exe}`),
+    path.join(repoRoot, "src-tauri", "target", "release", `anubis-engine${exe}`),
+    path.join(repoRoot, "target", "debug", `anubis-engine${exe}`),
+    path.join(repoRoot, "src-tauri", "target", "debug", `anubis-engine${exe}`),
+  ];
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!found) {
+    throw new Error(
+      `Could not find anubis-engine binary. Build it with "cargo build -p anubis-engine" or pass --bin <path>.`,
+    );
+  }
+  return found;
+}
+
+function defaultAppModelCacheDir(repoRoot) {
+  if (process.env.ANUBIS_BENCHMARK_MODEL_DIR) {
+    return path.resolve(process.env.ANUBIS_BENCHMARK_MODEL_DIR);
+  }
+  if (process.platform === "win32" && process.env.APPDATA) {
+    return path.join(process.env.APPDATA, "com.anubis-os.app");
+  }
+  if (process.platform === "darwin" && process.env.HOME) {
+    return path.join(process.env.HOME, "Library", "Application Support", "com.anubis-os.app");
+  }
+  if (process.env.XDG_DATA_HOME) {
+    return path.join(process.env.XDG_DATA_HOME, "com.anubis-os.app");
+  }
+  if (process.env.HOME) {
+    return path.join(process.env.HOME, ".local", "share", "com.anubis-os.app");
+  }
+  return path.join(repoRoot, ".fastembed_cache", "benchmark-models");
+}
+
+async function callTool(client, name, args) {
+  const response = await client.request("tools/call", {
+    name,
+    arguments: args || {},
+  });
+  if (!response || !response.result) {
+    throw new Error(`tools/call ${name} returned no result`);
+  }
+  if (response.result.isError) {
+    const text = (response.result.content || []).map((item) => item.text).join("\n");
+    throw new Error(`tools/call ${name} failed: ${text}`);
+  }
+  return response.result.structuredContent;
+}
+
+class JsonRpcClient {
+  constructor(binPath, env) {
+    this.binPath = binPath;
+    this.env = env;
+    this.nextId = 1;
+    this.pending = new Map();
+    this.stderr = "";
+  }
+
+  async start() {
+    this.child = spawn(this.binPath, ["--mcp"], {
+      env: { ...process.env, ...this.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    this.child.stderr.on("data", (chunk) => {
+      this.stderr += chunk.toString();
+    });
+    this.child.on("exit", (code, signal) => {
+      const error = new Error(`anubis-engine exited with code ${code} signal ${signal}\n${this.stderr}`);
+      for (const pending of this.pending.values()) {
+        pending.reject(error);
+      }
+      this.pending.clear();
+    });
+    this.reader = readline.createInterface({ input: this.child.stdout });
+    this.reader.on("line", (line) => this.handleLine(line));
+  }
+
+  handleLine(line) {
+    let response;
+    try {
+      response = JSON.parse(line);
+    } catch (error) {
+      return;
+    }
+    const pending = this.pending.get(response.id);
+    if (!pending) {
+      return;
+    }
+    clearTimeout(pending.timer);
+    this.pending.delete(response.id);
+    if (response.error) {
+      pending.reject(new Error(response.error.message));
+    } else {
+      pending.resolve(response);
+    }
+  }
+
+  request(method, params, timeoutMs = 10 * 60 * 1000) {
+    const id = this.nextId;
+    this.nextId += 1;
+    const payload = { jsonrpc: "2.0", id, method, params };
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`JSON-RPC request timed out: ${method}`));
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timer });
+      this.child.stdin.write(`${JSON.stringify(payload)}\n`, "utf8");
+    });
+  }
+
+  notify(method, params) {
+    const payload = { jsonrpc: "2.0", method, params };
+    this.child.stdin.write(`${JSON.stringify(payload)}\n`, "utf8");
+    return Promise.resolve();
+  }
+
+  async close() {
+    if (this.reader) {
+      this.reader.close();
+    }
+    if (!this.child || this.child.exitCode !== null) {
+      return;
+    }
+
+    const child = this.child;
+    const exited = new Promise((resolve) => child.once("exit", resolve));
+    child.stdin.end();
+    const graceful = await Promise.race([exited, delay(1500).then(() => "timeout")]);
+    if (graceful === "timeout" && child.exitCode === null && !child.killed) {
+      child.kill();
+      await Promise.race([exited, delay(1500)]);
+    }
+  }
+}
+
+async function rmDirWithRetry(dir) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!["EPERM", "EBUSY", "ENOTEMPTY"].includes(error.code) || attempt === 4) {
+        throw error;
+      }
+      await delay(250 * (attempt + 1));
+    }
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseArgs(argv) {
+  const options = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--bin") {
+      options.bin = argv[++i];
+    } else if (arg === "--data-dir") {
+      options.dataDir = argv[++i];
+    } else if (arg === "--keep") {
+      options.keepData = true;
+    } else if (arg === "--json") {
+      options.json = true;
+    } else if (arg === "--scale") {
+      const scale = argv[++i];
+      if (!["quick", "full"].includes(scale)) {
+        throw new Error("--scale must be quick or full");
+      }
+      options.scale = scale;
+    } else if (arg === "--generate-only") {
+      options.generateOnly = true;
+      options.keepData = true;
+    } else if (arg === "--help" || arg === "-h") {
+      options.help = true;
+    } else {
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+  }
+  return options;
+}
+
+function usage() {
+  return `Usage: node bin/benchmark.js [options]
+
+Options:
+  --bin <path>        Path to anubis-engine binary. Defaults to target debug/release binary.
+  --data-dir <path>   Dataset directory. Defaults to scratch/temp_benchmark_data.
+  --keep              Keep generated dataset after the run.
+  --json              Print JSON summary instead of the text report.
+  --scale <quick|full>
+                      quick keeps 52 files with smaller payloads; full uses the heavier stress corpus.
+  --generate-only     Generate the benchmark corpus and exit.
+  -h, --help          Show this help.
+`;
+}
+
+function nowMs() {
+  return Number(process.hrtime.bigint()) / 1_000_000;
+}
+
+function round1(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function round2(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatBytes(bytes) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
+}
+
+function fileSizeIfExists(file) {
+  try {
+    return fs.statSync(file).size;
+  } catch (_) {
+    return 0;
+  }
+}
+
+if (require.main === module) {
+  (async () => {
+    try {
+      const options = parseArgs(process.argv.slice(2));
+      if (options.help) {
+        process.stdout.write(usage());
+        return;
+      }
+      const result = await runBenchmark(options);
+      if (options.json) {
+        process.stdout.write(`${JSON.stringify(result.summary, null, 2)}\n`);
+      } else if (result.report) {
+        process.stdout.write(`${result.report}\n`);
+      } else {
+        process.stdout.write(`Generated ${result.dataset.sourceFiles.length} files in ${result.dataset.rootDir}\n`);
+      }
+    } catch (error) {
+      process.stderr.write(`${error.stack || error.message}\n`);
+      process.exitCode = 1;
+    }
+  })();
+}
+
+module.exports = {
+  QUERY_CASES,
+  calculateAqi,
+  evaluateSearchCase,
+  formatReport,
+  generateDataset,
+  percentile,
+  resolveEngineBinary,
+  runBenchmark,
+};

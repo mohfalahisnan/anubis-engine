@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{store::graph_store::GraphEdge, types::Chunk};
+use crate::{
+    store::{graph_store::GraphEdge, vectors::cosine_sim},
+    types::Chunk,
+};
 
 /// Minimum cosine for a *named* semantic edge.
 pub const SEMANTIC_THRESHOLD: f32 = 0.62;
@@ -107,10 +110,6 @@ fn dedupe_by_max_weight(edges: Vec<GraphEdge>) -> Vec<GraphEdge> {
         }
     }
     map.into_values().collect()
-}
-
-fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
-    crate::store::vectors::cosine_sim(a, b)
 }
 
 #[cfg(test)]
