@@ -33,6 +33,11 @@ pub struct AppState {
     /// of each `index_folder` call so a previous cancel doesn't poison
     /// the next run.
     pub cancel_token: Arc<AtomicBool>,
+    /// Workdir this AppState belongs to. Set by `WorkdirRegistry` after
+    /// construction; `None` when an `AppState` is built directly (legacy
+    /// path / tests). Indexer + preprocess attach it to progress events
+    /// so the frontend can filter by active workdir.
+    pub workdir_id: Option<crate::engine::workdir::WorkdirId>,
 }
 
 impl AppState {
@@ -62,7 +67,14 @@ impl AppState {
             graph: Arc::new(Mutex::new(petgraph::Graph::new())),
             indexing: Arc::new(Mutex::new(false)),
             cancel_token: Arc::new(AtomicBool::new(false)),
+            workdir_id: None,
         })
+    }
+
+    /// Convenience accessor that returns the workdir id as a `String` for
+    /// inclusion in event payloads.
+    pub fn workdir_id_str(&self) -> Option<String> {
+        self.workdir_id.as_ref().map(|id| id.as_str().to_string())
     }
 }
 

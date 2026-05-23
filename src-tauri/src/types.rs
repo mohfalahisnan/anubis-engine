@@ -177,6 +177,11 @@ pub struct IndexProgress {
     /// shape valid for legacy listeners.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stage: Option<IndexStage>,
+    /// Workdir this progress event belongs to. The frontend filters events
+    /// by `activeWorkdirId` so multi-workdir indexing doesn't leak into
+    /// unrelated panels. `None` for AppStates not built via WorkdirRegistry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workdir_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -240,6 +245,9 @@ pub struct PreprocessProgress {
     pub stage: Option<PreprocessStage>,
     pub status: IndexStatus,
     pub errors: Vec<String>,
+    /// Workdir this progress event belongs to (see `IndexProgress::workdir_id`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workdir_id: Option<String>,
 }
 
 #[cfg(test)]

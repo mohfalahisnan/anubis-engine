@@ -75,7 +75,8 @@ impl WorkdirRegistry {
         let db_path = storage_dir.join("anubis.db");
         let fts_path = storage_dir.join("fts_index");
 
-        let state = AppState::new(&db_path, &fts_path, self.embedder.clone())?;
+        let mut state = AppState::new(&db_path, &fts_path, self.embedder.clone())?;
+        state.workdir_id = Some(id.clone());
         let state = Arc::new(state);
 
         let returned = {

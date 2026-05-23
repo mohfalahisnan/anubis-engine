@@ -86,6 +86,7 @@ pub async fn run_preprocessing(
         // Nothing to do — emit a single Done event so the UI knows the
         // pre-pass finished and Stage C is about to start.
         emit(
+            state,
             &app,
             PreprocessProgress {
                 total: 0,
@@ -95,12 +96,14 @@ pub async fn run_preprocessing(
                 stage: None,
                 status: IndexStatus::Done,
                 errors: Vec::new(),
+            workdir_id: None,
             },
         );
         return Ok(report);
     }
 
     emit(
+        state,
         &app,
         PreprocessProgress {
             total,
@@ -110,6 +113,7 @@ pub async fn run_preprocessing(
             stage: None,
             status: IndexStatus::Running,
             errors: Vec::new(),
+        workdir_id: None,
         },
     );
 
@@ -117,6 +121,7 @@ pub async fn run_preprocessing(
         if state.cancel_token.load(Ordering::Relaxed) {
             report.cancelled = true;
             emit(
+                state,
                 &app,
                 PreprocessProgress {
                     total,
@@ -126,6 +131,7 @@ pub async fn run_preprocessing(
                     stage: None,
                     status: IndexStatus::Cancelled,
                     errors: collect_errors(&report),
+                workdir_id: None,
                 },
             );
             return Ok(report);
@@ -136,6 +142,7 @@ pub async fn run_preprocessing(
         if sidecar::is_fresh(path) {
             report.skipped_fresh.push(path.clone());
             emit(
+                state,
                 &app,
                 PreprocessProgress {
                     total,
@@ -145,6 +152,7 @@ pub async fn run_preprocessing(
                     stage: Some(PreprocessStage::CachedSkipped),
                     status: IndexStatus::Running,
                     errors: collect_errors(&report),
+                workdir_id: None,
                 },
             );
             continue;
@@ -153,6 +161,7 @@ pub async fn run_preprocessing(
         // Emit a "starting this file" event so the UI updates BEFORE the
         // slow step rather than only after it finishes.
         emit(
+            state,
             &app,
             PreprocessProgress {
                 total,
@@ -162,6 +171,7 @@ pub async fn run_preprocessing(
                 stage: Some(stage_for(*kind)),
                 status: IndexStatus::Running,
                 errors: collect_errors(&report),
+            workdir_id: None,
             },
         );
 
@@ -172,6 +182,7 @@ pub async fn run_preprocessing(
         {
             report.skipped_fresh.push(path.clone());
             emit(
+                state,
                 &app,
                 PreprocessProgress {
                     total,
@@ -181,6 +192,7 @@ pub async fn run_preprocessing(
                     stage: Some(PreprocessStage::CachedSkipped),
                     status: IndexStatus::Running,
                     errors: collect_errors(&report),
+                workdir_id: None,
                 },
             );
             continue;
@@ -205,6 +217,7 @@ pub async fn run_preprocessing(
         }
 
         emit(
+            state,
             &app,
             PreprocessProgress {
                 total,
@@ -214,6 +227,7 @@ pub async fn run_preprocessing(
                 stage: Some(stage_for(*kind)),
                 status: IndexStatus::Running,
                 errors: collect_errors(&report),
+            workdir_id: None,
             },
         );
     }
@@ -227,6 +241,7 @@ pub async fn run_preprocessing(
         IndexStatus::Done
     };
     emit(
+        state,
         &app,
         PreprocessProgress {
             total,
@@ -236,6 +251,7 @@ pub async fn run_preprocessing(
             stage: None,
             status: final_status,
             errors: collect_errors(&report),
+        workdir_id: None,
         },
     );
     Ok(report)
@@ -331,7 +347,8 @@ async fn record_error_doc(
     Ok(())
 }
 
-fn emit(app: &Option<AppHandle>, progress: PreprocessProgress) {
+fn emit(state: &AppState, app: &Option<AppHandle>, mut progress: PreprocessProgress) {
+    progress.workdir_id = state.workdir_id_str();
     if let Some(app) = app {
         if let Err(error) = app.emit("preprocess-progress", progress) {
             tracing::warn!("failed to emit preprocess progress: {}", error);

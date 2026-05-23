@@ -65,6 +65,7 @@ async fn index_folder_inner(
     let preprocess_report = preprocess::run_preprocessing(&paths, state, app.clone()).await?;
     if preprocess_report.cancelled {
         emit_progress(
+            state,
             &app,
             paths.len(),
             0,
@@ -99,6 +100,7 @@ async fn index_folder_inner(
         IndexStatus::Error
     };
     emit_progress(
+        state,
         &app,
         indexable_paths.len(),
         report.done,
@@ -120,6 +122,7 @@ async fn run_index_paths(
     for (index, path) in paths.iter().enumerate() {
         if state.cancel_token.load(Ordering::Relaxed) {
             emit_progress(
+                state,
                 &app,
                 paths.len(),
                 index,
@@ -141,6 +144,7 @@ async fn run_index_paths(
             .map(ToOwned::to_owned)
             .unwrap_or_else(|| path.to_string_lossy().into_owned());
         emit_progress(
+            state,
             &app,
             paths.len(),
             index,
@@ -186,6 +190,7 @@ async fn index_one(
         return Ok(false);
     }
     emit_progress(
+        state,
         app,
         total,
         done,
@@ -245,6 +250,7 @@ async fn index_one(
         return Ok(false);
     }
     emit_progress(
+        state,
         app,
         total,
         done,
@@ -333,6 +339,7 @@ async fn index_one(
         return Ok(false);
     }
     emit_progress(
+        state,
         app,
         total,
         done,
@@ -378,6 +385,7 @@ async fn index_one(
     }
 
     emit_progress(
+        state,
         app,
         total,
         done,
@@ -420,6 +428,7 @@ fn check_cancelled(
 ) -> bool {
     if state.cancel_token.load(Ordering::Relaxed) {
         emit_progress(
+            state,
             app,
             total,
             done,
@@ -511,6 +520,7 @@ fn is_supported(path: &Path) -> bool {
 }
 
 fn emit_progress(
+    state: &AppState,
     app: &Option<AppHandle>,
     total: usize,
     done: usize,
@@ -529,6 +539,7 @@ fn emit_progress(
                 status,
                 errors,
                 stage,
+                workdir_id: state.workdir_id_str(),
             },
         ) {
             tracing::warn!("failed to emit index progress: {}", error);
