@@ -15,7 +15,9 @@ import IndexStatus from "./components/IndexStatus";
 import KnowledgeBrowser, { DocumentRow } from "./components/KnowledgeBrowser";
 import ModelDownloadBanner from "./components/ModelDownloadBanner";
 import SearchBar from "./components/SearchBar";
+import WorkdirSwitcher from "./components/WorkdirSwitcher";
 import { Separator } from "./components/ui/separator";
+import { useWorkdir } from "./contexts/WorkdirContext";
 
 type Chunk = {
   id: string;
@@ -27,6 +29,7 @@ type Chunk = {
 type Mode = "global" | "focus" | "search";
 
 export default function App() {
+  const { activeWorkdir } = useWorkdir();
   const [selectedDocument, setSelectedDocument] = useState<DocumentRow | null>(
     null,
   );
@@ -42,10 +45,20 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<QueryResult[]>([]);
 
   const loadGlobalGraph = useCallback(async () => {
+    if (!activeWorkdir) {
+      setGraphData({ nodes: [], links: [] });
+      setHasIndex(false);
+      setMode("global");
+      setSelectedNodeId(null);
+      setFocusedResult(null);
+      setSearchResults([]);
+      return;
+    }
     setGraphLoading(true);
     setGraphError(null);
     try {
       const payload = await invoke<GraphOverviewPayload>("get_graph_overview", {
+        workdir: activeWorkdir,
         limit: 250,
       });
       setGraphData(overviewToGraphData(payload));
@@ -56,24 +69,20 @@ export default function App() {
       setHasIndex(payload.nodes.length > 0);
     } catch (reason) {
       const message = String(reason);
-      // First-run setup runs on a worker thread — keep the graph quiet until
-      // the engine is up rather than showing an alarming error.
       if (!message.toLowerCase().includes("still initialising")) {
         setGraphError(message);
       }
     } finally {
       setGraphLoading(false);
     }
-  }, []);
+  }, [activeWorkdir]);
 
   const showSearchConstellation = useCallback(
     async (results: QueryResult[], depth: number) => {
-      if (results.length === 0) return;
+      if (results.length === 0 || !activeWorkdir) return;
       setMode("search");
       setSearchResults(results);
       setFocusedResult(null);
-      // The top hit becomes the selected node so the inspector panel populates
-      // immediately. Frontend re-selects when the user clicks another card.
       setSelectedNodeId(results[0].chunk_id);
       setGraphLoading(true);
       setGraphError(null);
@@ -81,6 +90,7 @@ export default function App() {
         const neighborhood = await invoke<GraphOverviewPayload>(
           "get_search_neighborhood",
           {
+            workdir: activeWorkdir,
             chunkIds: results.map((r) => r.chunk_id),
             depth,
             limit: 200,
@@ -93,11 +103,12 @@ export default function App() {
         setGraphLoading(false);
       }
     },
-    [],
+    [activeWorkdir],
   );
 
   const focusOnChunk = useCallback(
     async (result: QueryResult, depth = relationDepth) => {
+      if (!activeWorkdir) return;
       setMode("focus");
       setSelectedNodeId(result.chunk_id);
       setFocusedResult(result);
@@ -110,6 +121,7 @@ export default function App() {
         const neighborhood = await invoke<GraphOverviewPayload>(
           "get_graph_neighborhood",
           {
+            workdir: activeWorkdir,
             chunkId: result.chunk_id,
             depth,
             limit: 160,
@@ -122,7 +134,7 @@ export default function App() {
         setGraphLoading(false);
       }
     },
-    [relationDepth],
+    [relationDepth, activeWorkdir],
   );
 
   // Click on a search-result card: just highlight in the current search
@@ -134,7 +146,7 @@ export default function App() {
 
   useEffect(() => {
     loadGlobalGraph();
-  }, [loadGlobalGraph, refreshKey]);
+  }, [loadGlobalGraph, refreshKey, activeWorkdir]);
 
   function handleIndexed() {
     setRefreshKey((value) => value + 1);
@@ -178,9 +190,11 @@ export default function App() {
   }
 
   async function handleSelectDocument(document: DocumentRow) {
+    if (!activeWorkdir) return;
     setSelectedDocument(document);
     try {
       const chunks = await invoke<Chunk[]>("get_doc_chunks", {
+        workdir: activeWorkdir,
         docId: document.id,
       });
       const firstChunk = chunks[0];
@@ -205,7 +219,11 @@ export default function App() {
   }
 
   async function handleReindexDocument(document: DocumentRow) {
-    await invoke("index_file", { path: document.path });
+    if (!activeWorkdir) return;
+    await invoke("index_file", {
+      workdir: activeWorkdir,
+      path: document.path,
+    });
     setRefreshKey((value) => value + 1);
     if (selectedDocument?.id === document.id) {
       await handleSelectDocument(document);
@@ -230,6 +248,10 @@ export default function App() {
 
         <Separator />
 
+        <WorkdirSwitcher />
+
+        <Separator />
+
         <IndexStatus onIndexed={handleIndexed} onCleared={handleCleared} />
 
         <Separator />
@@ -251,7 +273,9 @@ export default function App() {
           }}
         />
 
-        {hasIndex || graphData.nodes.length > 0 || graphLoading ? (
+        {!activeWorkdir ? (
+          <NoWorkdirState />
+        ) : hasIndex || graphData.nodes.length > 0 || graphLoading ? (
           <GraphVisualizer
             data={graphData}
             mode={mode}
@@ -284,6 +308,20 @@ function EmptyState() {
           Pick a folder on the left — Anubis will parse, embed, and graph every
           document. The global knowledge graph will appear here once indexing
           finishes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function NoWorkdirState() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--color-border)] p-12 text-center">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold">Pick or add a workdir</h2>
+        <p className="max-w-md text-sm text-[var(--color-muted-foreground)]">
+          Use the workdir switcher in the sidebar to pick an existing workdir
+          or add a new one. Anubis keeps a separate index per workdir.
         </p>
       </div>
     </div>

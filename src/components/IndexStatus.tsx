@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { Badge } from "./ui/badge";
 import { cn } from "../lib/utils";
+import { useWorkdir } from "../contexts/WorkdirContext";
 
 type Stats = {
   documents?: number;
@@ -35,6 +36,7 @@ type Progress = {
   status: "idle" | "running" | "done" | "error" | "cancelled";
   errors: string[];
   stage?: "parsing" | "embedding" | "writing" | "linking";
+  workdir_id?: string | null;
 };
 
 type PreprocessProgress = {
@@ -45,6 +47,7 @@ type PreprocessProgress = {
   errors: string[];
   kind?: "video" | "audio" | "image" | "pdf";
   stage?: "transcribing" | "ocr" | "cachedskipped" | "cached_skipped";
+  workdir_id?: string | null;
 };
 
 type Props = {
@@ -57,6 +60,7 @@ type Settings = {
 };
 
 export default function IndexStatus({ onIndexed, onCleared }: Props) {
+  const { activeWorkdir, activeWorkdirId, refreshKnownWorkdirs } = useWorkdir();
   const [path, setPath] = useState("");
   const [stats, setStats] = useState<Stats>({});
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -69,8 +73,14 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
   const [savingTranscribe, setSavingTranscribe] = useState(false);
 
   async function loadStats() {
+    if (!activeWorkdir) {
+      setStats({});
+      return;
+    }
     try {
-      const nextStats = await invoke<Stats>("get_index_stats");
+      const nextStats = await invoke<Stats>("get_index_stats", {
+        workdir: activeWorkdir,
+      });
       setStats(nextStats);
       setError(null);
     } catch (reason) {
@@ -107,7 +117,8 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkdir]);
 
   async function loadSettings() {
     try {
@@ -135,6 +146,15 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
 
   useEffect(() => {
     const unlisten = listen<Progress>("index-progress", (event) => {
+      // Drop events from other workdirs so concurrent indexing doesn't
+      // mix progress bars.
+      if (
+        event.payload.workdir_id &&
+        activeWorkdirId &&
+        event.payload.workdir_id !== activeWorkdirId
+      ) {
+        return;
+      }
       setProgress(event.payload);
       if (event.payload.status === "running") {
         setPreprocessProgress(null);
@@ -155,10 +175,18 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     return () => {
       unlisten.then((dispose) => dispose()).catch(() => undefined);
     };
-  }, [onIndexed]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onIndexed, activeWorkdirId]);
 
   useEffect(() => {
     const unlisten = listen<PreprocessProgress>("preprocess-progress", (event) => {
+      if (
+        event.payload.workdir_id &&
+        activeWorkdirId &&
+        event.payload.workdir_id !== activeWorkdirId
+      ) {
+        return;
+      }
       setPreprocessProgress(event.payload);
       if (event.payload.status === "cancelled") {
         setBusy(false);
@@ -168,7 +196,8 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     return () => {
       unlisten.then((dispose) => dispose()).catch(() => undefined);
     };
-  }, [onIndexed]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onIndexed, activeWorkdirId]);
 
   async function pickFolder() {
     try {
@@ -186,15 +215,17 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
   }
 
   async function indexFolder() {
-    if (!path.trim()) return;
+    if (!path.trim() || !activeWorkdir) return;
     setBusy(true);
     setError(null);
     setPreprocessProgress(null);
     setProgress(null);
     try {
-      await invoke("index_folder", { path: path.trim() });
+      await invoke("index_folder", { workdir: activeWorkdir, path: path.trim() });
       setBusy(false);
       await loadStats();
+      // Pick up the newly-registered storage dir in the workdir picker.
+      void refreshKnownWorkdirs();
       onIndexed();
     } catch (reason) {
       setBusy(false);
@@ -203,16 +234,16 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
   }
 
   async function cancelIndexing() {
-    if (!busy) return;
+    if (!busy || !activeWorkdir) return;
     try {
-      await invoke("cancel_indexing");
+      await invoke("cancel_indexing", { workdir: activeWorkdir });
     } catch (reason) {
       setError(String(reason));
     }
   }
 
   async function clearIndex() {
-    if (clearing) return;
+    if (clearing || !activeWorkdir) return;
     const confirmed = window.confirm(
       "Clear all indexed data? This removes every document, chunk, vector, and graph edge. Source files stay untouched.",
     );
@@ -220,7 +251,7 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     setClearing(true);
     setError(null);
     try {
-      await invoke("reset_index");
+      await invoke("reset_index", { workdir: activeWorkdir });
       setProgress(null);
       await loadStats();
       onCleared();
@@ -349,7 +380,7 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
         <div className="flex gap-2">
           <Button
             onClick={indexFolder}
-            disabled={busy || !path.trim()}
+            disabled={busy || !path.trim() || !activeWorkdir}
             className="flex-1"
             size="sm"
           >
@@ -370,7 +401,7 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
           </Button>
           <Button
             onClick={clearIndex}
-            disabled={clearing || busy || !hasIndex}
+            disabled={clearing || busy || !hasIndex || !activeWorkdir}
             variant="outline"
             size="sm"
             title="Clear all indexed data"

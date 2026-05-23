@@ -5,6 +5,7 @@ import type { QueryResult } from "./GraphVisualizer";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
+import { useWorkdir } from "../contexts/WorkdirContext";
 
 type Props = {
   selectedChunkId?: string | null;
@@ -48,6 +49,7 @@ export default function SearchBar({
   onSelectResult,
   onResults,
 }: Props) {
+  const { activeWorkdir } = useWorkdir();
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<QueryResult[]>([]);
   const [busy, setBusy] = useState(false);
@@ -55,11 +57,12 @@ export default function SearchBar({
   const [depth, setDepth] = useState<SearchDepth>(1);
 
   async function submit() {
-    if (!queryText.trim()) return;
+    if (!queryText.trim() || !activeWorkdir) return;
     setBusy(true);
     setError(null);
     try {
       const nextResults = await invoke<QueryResult[]>("query", {
+        workdir: activeWorkdir,
         q: queryText.trim(),
         limit: 10,
         depth,
@@ -86,11 +89,20 @@ export default function SearchBar({
             onKeyDown={(event) => {
               if (event.key === "Enter") submit();
             }}
-            placeholder="Search — BM25 + vector + entity + graph"
+            placeholder={
+              activeWorkdir
+                ? "Search — BM25 + vector + entity + graph"
+                : "Pick a workdir to enable search"
+            }
+            disabled={!activeWorkdir}
             className="h-10 pl-9"
           />
         </div>
-        <Button onClick={submit} disabled={busy || !queryText.trim()} size="lg">
+        <Button
+          onClick={submit}
+          disabled={busy || !queryText.trim() || !activeWorkdir}
+          size="lg"
+        >
           {busy ? (
             <>
               <Loader2 className="size-4 animate-spin" /> Searching

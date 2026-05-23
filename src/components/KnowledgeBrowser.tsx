@@ -17,6 +17,7 @@ import { cn } from "../lib/utils";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { useWorkdir } from "../contexts/WorkdirContext";
 
 export type DocumentRow = {
   id: string;
@@ -53,18 +54,24 @@ export default function KnowledgeBrowser({
   onSelect,
   onReindex,
 }: Props) {
+  const { activeWorkdir } = useWorkdir();
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [filter, setFilter] = useState("");
   const [reindexingId, setReindexingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!activeWorkdir) {
+      setDocuments([]);
+      return;
+    }
     let cancelled = false;
     async function load() {
-      // Tolerate the engine still booting on first run — quietly retry.
       for (let attempt = 0; attempt < 60 && !cancelled; attempt++) {
         try {
-          const docs = await invoke<DocumentRow[]>("list_documents");
+          const docs = await invoke<DocumentRow[]>("list_documents", {
+            workdir: activeWorkdir,
+          });
           if (!cancelled) setDocuments(docs);
           return;
         } catch (reason) {
@@ -81,7 +88,7 @@ export default function KnowledgeBrowser({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, activeWorkdir]);
 
   async function reindexDocument(document: DocumentRow) {
     if (!onReindex || reindexingId) return;
