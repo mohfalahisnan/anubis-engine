@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use crate::{embedder, store, EngineError};
+use crate::{store, EngineError};
 
 /// Shared handle to the engine. `None` while first-run initialisation is
 /// still in progress (model downloads, schema migration, FTS reconcile).
@@ -37,47 +37,51 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(db_path: &std::path::Path, fts_path: &std::path::Path) -> Result<Self, EngineError> {
-        // Wire the OCR + embedding model directories before any module
-        // touches them. Both live next to the SQLite database.
-        if let Some(parent) = db_path.parent() {
-            crate::ocr::engine::set_models_dir(parent.to_path_buf());
-            embedder::download::set_models_dir(parent.to_path_buf());
-            crate::transcription::engine::set_models_dir(parent.to_path_buf());
-        }
-
+    /// Build an `AppState` for one workdir's storage. The embedder is shared
+    /// across workdirs (one model loaded into memory once) and is supplied
+    /// by the caller. OCR + transcription models are configured globally on
+    /// startup before any `AppState` is built — see [`bootstrap_shared_engines`].
+    pub fn new(
+        db_path: &std::path::Path,
+        fts_path: &std::path::Path,
+        embedder: Arc<Mutex<fastembed::TextEmbedding>>,
+    ) -> Result<Self, EngineError> {
         let db = store::db::open(db_path)?;
         // Hydrate persisted runtime settings (transcription toggle, etc.).
         crate::engine::settings::load_from_db(&db)?;
-        // If the user previously indexed with a different embedding model, the
-        // old vectors are no longer comparable to fresh query embeddings.
-        // Detect a swap and clear stale derived data (vectors + chunks + edges
-        // + entities), then mark every document as pending so the next index
-        // pass regenerates them.
         invalidate_on_model_change(&db, EMBEDDING_MODEL_ID)?;
         invalidate_on_chunk_signal_change(&db, CHUNK_SIGNAL_MODEL_ID)?;
 
         let fts = store::fts::open_or_create(fts_path)?;
         store::fts::rebuild_from_indexed_chunks(&fts, &db)?;
         tracing::info!("reconciled full-text index from SQLite chunks");
-        // MultilingualE5Small: 384 dim (same as previous AllMiniLML6V2 — no
-        // vector-store migration needed), but trained on 100+ languages with
-        // strong recall on Indonesian content.
-        //
-        // Downloading is done by our own ureq client (longer timeout, real
-        // progress events). `load_or_download` emits start/downloading/ready
-        // / error itself.
-        let embedder = embedder::download::load_or_download()?;
 
         Ok(Self {
             db: Arc::new(Mutex::new(db)),
-            embedder: Arc::new(Mutex::new(embedder)),
+            embedder,
             fts: Arc::new(Mutex::new(fts)),
             graph: Arc::new(Mutex::new(petgraph::Graph::new())),
             indexing: Arc::new(Mutex::new(false)),
             cancel_token: Arc::new(AtomicBool::new(false)),
         })
     }
+}
+
+/// Configure global model directories and load the embedder. Runs once on
+/// startup before any [`AppState`] is constructed. The returned handle is
+/// shared across all per-workdir `AppState`s built by `WorkdirRegistry`.
+pub fn bootstrap_shared_engines(
+    models_dir: &std::path::Path,
+) -> Result<Arc<Mutex<fastembed::TextEmbedding>>, EngineError> {
+    crate::ocr::engine::set_models_dir(models_dir.to_path_buf());
+    crate::embedder::download::set_models_dir(models_dir.to_path_buf());
+    crate::transcription::engine::set_models_dir(models_dir.to_path_buf());
+
+    // MultilingualE5Small: 384 dim, trained on 100+ languages with strong
+    // recall on Indonesian content. `load_or_download` emits its own
+    // start/downloading/ready/error events.
+    let embedder = crate::embedder::download::load_or_download()?;
+    Ok(Arc::new(Mutex::new(embedder)))
 }
 
 fn invalidate_on_chunk_signal_change(

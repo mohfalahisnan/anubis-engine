@@ -60,7 +60,13 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
     }
     let fts_path = get_fts_path(&db_path);
 
-    let state = AppState::new(&db_path, &fts_path)
+    let models_dir = db_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let embedder = crate::engine::state::bootstrap_shared_engines(&models_dir)
+        .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
+    let state = AppState::new(&db_path, &fts_path, embedder)
         .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
 
     let stdin = io::stdin();

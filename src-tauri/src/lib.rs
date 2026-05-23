@@ -74,9 +74,18 @@ fn try_run() -> tauri::Result<()> {
             let engine = new_engine_handle();
             app.manage(engine.clone());
 
+            let models_dir = app_data.clone();
             std::thread::spawn(move || {
                 events::emit_starting("engine", "Engine bootstrap");
-                match AppState::new(&db_path, &fts_path) {
+                let embedder = match crate::engine::state::bootstrap_shared_engines(&models_dir) {
+                    Ok(handle) => handle,
+                    Err(error) => {
+                        tracing::error!("engine bootstrap failed: {error}");
+                        events::emit_error("engine", "Engine bootstrap", error.to_string());
+                        return;
+                    }
+                };
+                match AppState::new(&db_path, &fts_path, embedder) {
                     Ok(state) => {
                         if engine.set(state).is_err() {
                             tracing::warn!("engine handle already initialised");
