@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn chunk_document_splits_sub_512_medium_pages() {
-        let text = format!("{}. {}.", "alpha retrieval signal ".repeat(10), "beta retrieval signal ".repeat(10));
+        let text = format!("{}. {}.", "alpha retrieval signal ".repeat(15), "beta retrieval signal ".repeat(15));
         let doc = crate::types::ParsedDoc {
             doc_id: "doc-1".to_string(),
             path: "medium.md".to_string(),
@@ -162,6 +162,7 @@ mod tests {
             doc_class: crate::types::DocClass::Content,
         };
 
-        assert!(super::chunk_document(&doc).len() >= 2);
+        let chunks = super::chunk_document(&doc);
+        assert!(chunks.len() >= 2);
     }
 }

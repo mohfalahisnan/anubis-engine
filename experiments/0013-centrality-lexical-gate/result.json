@@ -1,0 +1,2709 @@
+{
+  "experiment": {
+    "id": "0013-centrality-lexical-gate",
+    "suite": "quick",
+    "baseline": "current-alpha-2026-05-23-0012-doc-cap-after-fanout",
+    "workdir": "D:\\workspaces\\coding\\projects\\anubis-engine\\scratch\\temp_benchmark_data",
+    "behaviorChange": true
+  },
+  "decision": "revert",
+  "before": {
+    "aqi": 81,
+    "recallAt10": 0.96,
+    "precisionAt10": 0.38,
+    "p95LatencyMs": 239,
+    "criticalFailures": 0,
+    "permissionLeakage": 0
+  },
+  "after": {
+    "aqi": 66.9,
+    "recallAt10": 0.98,
+    "precisionAt10": 0.39,
+    "p95LatencyMs": 1431,
+    "criticalFailures": 0,
+    "permissionLeakage": 0
+  },
+  "gatedAqi": 66.9,
+  "productionChecks": {
+    "aqi": {
+      "actual": 66.9,
+      "target": 85,
+      "pass": false
+    },
+    "recallAt10": {
+      "actual": 0.98,
+      "target": 0.92,
+      "pass": true
+    },
+    "precisionAt10": {
+      "actual": 0.39,
+      "target": 0.45,
+      "pass": false
+    },
+    "top3Accuracy": {
+      "actual": 1,
+      "target": 0.8,
+      "pass": true
+    },
+    "mrrAt10": {
+      "actual": 0.97,
+      "target": 0.7,
+      "pass": true
+    },
+    "ndcgAt10": {
+      "actual": 0.96,
+      "target": 0.75,
+      "pass": true
+    },
+    "p95LatencyMs": {
+      "actual": 1431,
+      "target": 500,
+      "pass": false
+    },
+    "p99LatencyMs": {
+      "actual": 1431,
+      "target": 900,
+      "pass": false
+    },
+    "criticalFailures": {
+      "actual": 0,
+      "target": 0,
+      "pass": true
+    },
+    "permissionLeakage": {
+      "actual": 0,
+      "target": 0,
+      "pass": true
+    },
+    "indexingCrashed": {
+      "actual": false,
+      "target": false,
+      "pass": true
+    }
+  },
+  "criticalFailureDiagnostics": [],
+  "summary": {
+    "bootstrapMs": 12499,
+    "workdir": "D:\\workspaces\\coding\\projects\\anubis-engine\\scratch\\temp_benchmark_data",
+    "workdirsRoot": "C:\\Users\\User\\AppData\\Local\\Temp\\anubis-benchmark-run-sklUE3\\workdirs",
+    "dbPath": "C:\\Users\\User\\AppData\\Local\\Temp\\anubis-benchmark-run-sklUE3\\workdirs\\b3e23b98519f401a\\anubis.db",
+    "dbSizeBytes": 11640832,
+    "preprocess": {
+      "total": 13,
+      "cacheHits": 9,
+      "expectedRuns": 4
+    },
+    "indexMs": 34031,
+    "indexingPhases": {
+      "discoveryMs": null,
+      "cacheCheckMs": null,
+      "textExtractionMs": null,
+      "ocrMs": null,
+      "chunkingMs": null,
+      "embeddingMs": null,
+      "edgeGenerationMs": null,
+      "dbWriteMs": null,
+      "totalMs": 34031
+    },
+    "throughputFilesPerSec": 1.5,
+    "throughputKbPerSec": 3.2,
+    "stats": {
+      "chunks": 420,
+      "documents": 52,
+      "edges_by_type": {
+        "semantic": 28038,
+        "shared_anchor": 56,
+        "shared_entity": 1246
+      },
+      "entities": 5989,
+      "graph_edges": 29340,
+      "last_indexed": "2026-05-23T11:57:58.515630200+00:00"
+    },
+    "graphMetrics": {
+      "totalNodes": 420,
+      "totalEdges": 29340,
+      "edgesPerChunk": 69.86,
+      "candidateEdges": 29340,
+      "visibleEdges": null,
+      "visibleEdgesPerNode": null,
+      "weakEdgeRatio": null,
+      "duplicateEdgeRatio": null,
+      "edgeEvidenceCoverage": 0.04,
+      "edgesByType": {
+        "semantic": 28038,
+        "shared_anchor": 56,
+        "shared_entity": 1246
+      }
+    },
+    "queryLatency": {
+      "averageMs": 259,
+      "p50Ms": 178,
+      "p95Ms": 1431,
+      "p99Ms": 1431
+    },
+    "averageRecallAtK": 0.96,
+    "averagePrecisionAtK": 0.24,
+    "averageRecallAt5": 0.96,
+    "averagePrecisionAt5": 0.64,
+    "averageRecallAt10": 0.98,
+    "averagePrecisionAt10": 0.39,
+    "top1Accuracy": 0.93,
+    "top3Accuracy": 1,
+    "mrrAt10": 0.97,
+    "ndcgAt10": 0.96,
+    "queryStatusCounts": {
+      "strong_pass": 0,
+      "pass": 2,
+      "weak_pass": 12,
+      "fail": 1,
+      "critical_fail": 0
+    },
+    "criticalFailures": 0,
+    "permissionLeakage": 0,
+    "aqi": 66.9,
+    "graphCheck": {
+      "status": "PASS",
+      "edgeReason": "anchor:INC-2026-ATLAS-014"
+    },
+    "downrankCheck": {
+      "status": "PASS",
+      "reason": "reference document did not enter top results"
+    },
+    "jsonCheck": {
+      "status": "PASS",
+      "chunks": 177,
+      "page": 3
+    },
+    "criticalFailureDiagnostics": [],
+    "searchReports": [
+      {
+        "label": "printer replacement",
+        "query": "thermal printer printhead replacement",
+        "recallAtK": 1,
+        "precisionAtK": 0.33,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "shipping_module.md",
+          "shipping_module.md",
+          "shipping_module.md"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.88,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.84,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "b98876cc-8a65-492b-bb8b-cf686af8c862",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "b98876cc-8a65-492b-bb8b-cf686af8c862",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.06,
+              "sourceQuality": 0.84,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "a2d6befa-a081-463a-b52d-b5edf0f76268",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "a2d6befa-a081-463a-b52d-b5edf0f76268",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.98,
+              "graph": 0,
+              "entity": 0.06,
+              "sourceQuality": 0.84,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "248a6725-5509-418c-b330-0ce603cb3257",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "248a6725-5509-418c-b330-0ce603cb3257",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.94,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.84,
+              "final": 0.76
+            }
+          },
+          {
+            "resultId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "documentId": "2b52a185-6d16-48d4-8cf9-f0da9e5b155b",
+            "chunkId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "title": "syslog_03.txt",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.73,
+              "graph": 0,
+              "entity": 0.66,
+              "sourceQuality": 0.79,
+              "final": 0.75
+            }
+          },
+          {
+            "resultId": "a63e938f-fe28-4e7f-af5e-89bc8d986abf",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "a63e938f-fe28-4e7f-af5e-89bc8d986abf",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.11,
+              "graph": 1,
+              "entity": 0.06,
+              "sourceQuality": 0.99,
+              "final": 0.61
+            }
+          },
+          {
+            "resultId": "2a388a00-d1d5-4b88-bfac-292887bcefd0",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "2a388a00-d1d5-4b88-bfac-292887bcefd0",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.11,
+              "graph": 0.99,
+              "entity": 0.06,
+              "sourceQuality": 0.98,
+              "final": 0.61
+            }
+          },
+          {
+            "resultId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0.27,
+              "graph": 0,
+              "entity": 0.26,
+              "sourceQuality": 0.89,
+              "final": 0.53
+            }
+          },
+          {
+            "resultId": "e29ee2b5-106e-4814-820f-6259b3158f03",
+            "documentId": "08f0b0c9-4a16-4572-a003-0a5f45859be6",
+            "chunkId": "e29ee2b5-106e-4814-820f-6259b3158f03",
+            "title": "syslog_07.txt",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0.22,
+              "graph": 0,
+              "entity": 0.33,
+              "sourceQuality": 0.77,
+              "final": 0.52
+            }
+          },
+          {
+            "resultId": "b46052ed-6023-4e62-bc3f-7ebce71fa1a3",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "b46052ed-6023-4e62-bc3f-7ebce71fa1a3",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0.23,
+              "graph": 0,
+              "entity": 0.13,
+              "sourceQuality": 0.86,
+              "final": 0.51
+            }
+          }
+        ],
+        "latencyMs": 1431,
+        "category": "accuracy"
+      },
+      {
+        "label": "atlas incident anchor",
+        "query": "INC-2026-ATLAS-014",
+        "recallAtK": 1,
+        "precisionAtK": 0.4,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.4,
+        "precisionAt10": 0.2,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "syslog_03.txt",
+          "shipping_module.md",
+          "readme_master.md",
+          "activity_log.csv",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "documentId": "2b52a185-6d16-48d4-8cf9-f0da9e5b155b",
+            "chunkId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "title": "syslog_03.txt",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.79,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0,
+              "bm25": 0.7,
+              "graph": 0.9,
+              "entity": 1,
+              "sourceQuality": 0.84,
+              "final": 0.52
+            }
+          },
+          {
+            "resultId": "9fed888f-4d4e-4c08-9102-d55ce71e9aaf",
+            "documentId": "d07e1551-bed3-412b-88cb-1bd9050a47df",
+            "chunkId": "9fed888f-4d4e-4c08-9102-d55ce71e9aaf",
+            "title": "readme_master.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.63,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.88,
+              "final": 0.51
+            }
+          },
+          {
+            "resultId": "5a0bb7ca-7928-46b3-8850-ed78562e57d0",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5a0bb7ca-7928-46b3-8850-ed78562e57d0",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "35188177-a588-46b7-9a4c-2b31b21af401",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "35188177-a588-46b7-9a4c-2b31b21af401",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "a84a9160-6115-46c2-ab55-5d114a3b5dd7",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "a84a9160-6115-46c2-ab55-5d114a3b5dd7",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "348e5630-2496-4585-a83b-31ec6520e66b",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "348e5630-2496-4585-a83b-31ec6520e66b",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "49946d6d-ba86-4ac7-983c-963937b5c27b",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "49946d6d-ba86-4ac7-983c-963937b5c27b",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "c1c65145-b94c-46f3-b2eb-b1420c4f2ac0",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "c1c65145-b94c-46f3-b2eb-b1420c4f2ac0",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.07,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.46
+            }
+          }
+        ],
+        "latencyMs": 282,
+        "category": "graph"
+      },
+      {
+        "label": "active module listing",
+        "query": "active module listing",
+        "recallAtK": 0.33,
+        "precisionAtK": 0.2,
+        "recallAt5": 0.33,
+        "recallAt10": 0.67,
+        "precisionAt5": 0.2,
+        "precisionAt10": 0.3,
+        "top1Accuracy": 0,
+        "top3Accuracy": 1,
+        "mrrAt10": 0.5,
+        "ndcgAt10": 0.45,
+        "queryStatus": "fail",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "returns_module.md",
+          "inventory_module.md",
+          "returns_module.md",
+          "support_module.md",
+          "compliance_module.md"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "91a1694e-f817-459b-af55-f33d30d1c47f",
+            "documentId": "6a2b2ddc-f2ad-4612-9684-cf5fb8445d1b",
+            "chunkId": "91a1694e-f817-459b-af55-f33d30d1c47f",
+            "title": "returns_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.99,
+              "graph": 0.93,
+              "entity": 0.8,
+              "sourceQuality": 0.86,
+              "final": 1
+            }
+          },
+          {
+            "resultId": "75d96590-114b-407a-80e7-7fae823b4587",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "75d96590-114b-407a-80e7-7fae823b4587",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.96,
+              "graph": 1,
+              "entity": 0.8,
+              "sourceQuality": 0.88,
+              "final": 1
+            }
+          },
+          {
+            "resultId": "1eb4a582-b089-41ab-83d8-492d6ead6eb2",
+            "documentId": "6a2b2ddc-f2ad-4612-9684-cf5fb8445d1b",
+            "chunkId": "1eb4a582-b089-41ab-83d8-492d6ead6eb2",
+            "title": "returns_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.99,
+              "graph": 0.93,
+              "entity": 0.8,
+              "sourceQuality": 0.86,
+              "final": 1
+            }
+          },
+          {
+            "resultId": "434cdcc7-196e-468a-9849-a5d8e2990048",
+            "documentId": "89d41f2c-fc73-47d0-8145-ba176b4b8e8a",
+            "chunkId": "434cdcc7-196e-468a-9849-a5d8e2990048",
+            "title": "support_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.94,
+              "graph": 0.99,
+              "entity": 0.8,
+              "sourceQuality": 1,
+              "final": 1
+            }
+          },
+          {
+            "resultId": "430ee4b8-237a-4dd1-8ce8-0b215872b33c",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "430ee4b8-237a-4dd1-8ce8-0b215872b33c",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.94,
+              "graph": 0.99,
+              "entity": 0.8,
+              "sourceQuality": 0.8,
+              "final": 0.99
+            }
+          },
+          {
+            "resultId": "bde52e68-2d13-4713-9b0a-737f98a7f9aa",
+            "documentId": "759fc8b6-3995-4e57-86f0-79003515b5f9",
+            "chunkId": "bde52e68-2d13-4713-9b0a-737f98a7f9aa",
+            "title": "catalog_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.99,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 0.91,
+              "final": 0.94
+            }
+          },
+          {
+            "resultId": "e27fcd9d-dd0b-4660-a838-763b56167c66",
+            "documentId": "0ad15736-549b-4d31-a757-ae8746915241",
+            "chunkId": "e27fcd9d-dd0b-4660-a838-763b56167c66",
+            "title": "billing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.99,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 0.87,
+              "final": 0.94
+            }
+          },
+          {
+            "resultId": "9ba63180-8107-4a55-adcf-9463930710fc",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "9ba63180-8107-4a55-adcf-9463930710fc",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.98,
+              "graph": 0.97,
+              "entity": 0,
+              "sourceQuality": 0.89,
+              "final": 0.93
+            }
+          },
+          {
+            "resultId": "d26dad4e-e70f-42c7-a5c0-2729c210d807",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "d26dad4e-e70f-42c7-a5c0-2729c210d807",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.99,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 0.82,
+              "final": 0.93
+            }
+          },
+          {
+            "resultId": "ffd4767f-acc5-484f-b5bf-66b34218b555",
+            "documentId": "35b74c63-f16d-4b44-9946-584e69cd0f1e",
+            "chunkId": "ffd4767f-acc5-484f-b5bf-66b34218b555",
+            "title": "auth_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.94,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.88,
+              "final": 0.92
+            }
+          }
+        ],
+        "latencyMs": 178,
+        "category": "downrank"
+      },
+      {
+        "label": "audit item 42",
+        "query": "audit log item 42",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 1,
+        "precisionAt10": 1,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "inventory_audit.json",
+          "inventory_audit.json",
+          "inventory_audit.json",
+          "inventory_audit.json",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.8,
+              "sourceQuality": 0.9,
+              "final": 0.87
+            }
+          },
+          {
+            "resultId": "21b2f73f-0c1b-4680-998e-419160c3c550",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "21b2f73f-0c1b-4680-998e-419160c3c550",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.4,
+              "graph": 1,
+              "entity": 0.8,
+              "sourceQuality": 0.92,
+              "final": 0.81
+            }
+          },
+          {
+            "resultId": "87a45a9e-a4bb-435c-a87d-2966318340a2",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "87a45a9e-a4bb-435c-a87d-2966318340a2",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.4,
+              "graph": 1,
+              "entity": 0.8,
+              "sourceQuality": 0.92,
+              "final": 0.81
+            }
+          },
+          {
+            "resultId": "8678a5d0-1000-451a-a3ee-851dcd48b2d2",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "8678a5d0-1000-451a-a3ee-851dcd48b2d2",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0.8,
+              "sourceQuality": 0.92,
+              "final": 0.8
+            }
+          },
+          {
+            "resultId": "8f2c50ed-c07e-4a41-9ac7-d701652f3593",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "8f2c50ed-c07e-4a41-9ac7-d701652f3593",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0.8,
+              "sourceQuality": 0.92,
+              "final": 0.8
+            }
+          },
+          {
+            "resultId": "c75db679-061f-4d45-89a9-8696cd4b341b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c75db679-061f-4d45-89a9-8696cd4b341b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.4,
+              "graph": 0.97,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.73
+            }
+          },
+          {
+            "resultId": "a6390a65-2217-44b1-8752-aa1c6d8991e5",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "a6390a65-2217-44b1-8752-aa1c6d8991e5",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.73
+            }
+          },
+          {
+            "resultId": "a7367817-c854-4328-b018-e80857c68174",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "a7367817-c854-4328-b018-e80857c68174",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.73
+            }
+          },
+          {
+            "resultId": "c5cc5748-2d0b-4799-bd8f-84a92cce4c77",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c5cc5748-2d0b-4799-bd8f-84a92cce4c77",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.73
+            }
+          },
+          {
+            "resultId": "edb6a93a-18da-4889-9fed-1954755ee668",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "edb6a93a-18da-4889-9fed-1954755ee668",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.4,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.73
+            }
+          }
+        ],
+        "latencyMs": 194,
+        "category": "json"
+      },
+      {
+        "label": "payment ledger",
+        "query": "payment reconciliation ledger",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "billing_module.md",
+          "billing_module.md",
+          "billing_module.md",
+          "billing_module.md",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "cd69631b-d15c-466b-9246-7ae098fffea1",
+            "documentId": "0ad15736-549b-4d31-a757-ae8746915241",
+            "chunkId": "cd69631b-d15c-466b-9246-7ae098fffea1",
+            "title": "billing_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.9,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.89,
+              "final": 0.86
+            }
+          },
+          {
+            "resultId": "6e4e81d4-5aaa-422f-be46-7ea0046c2cc6",
+            "documentId": "0ad15736-549b-4d31-a757-ae8746915241",
+            "chunkId": "6e4e81d4-5aaa-422f-be46-7ea0046c2cc6",
+            "title": "billing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.88,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "e27fcd9d-dd0b-4660-a838-763b56167c66",
+            "documentId": "0ad15736-549b-4d31-a757-ae8746915241",
+            "chunkId": "e27fcd9d-dd0b-4660-a838-763b56167c66",
+            "title": "billing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.87,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "f841d28c-f1a1-4c9f-a0a1-148408da4bd9",
+            "documentId": "0ad15736-549b-4d31-a757-ae8746915241",
+            "chunkId": "f841d28c-f1a1-4c9f-a0a1-148408da4bd9",
+            "title": "billing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.8,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.94,
+              "final": 0.78
+            }
+          },
+          {
+            "resultId": "79eb0c1a-5e9e-48d3-9bb3-6e9585e5783e",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "79eb0c1a-5e9e-48d3-9bb3-6e9585e5783e",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.43
+            }
+          },
+          {
+            "resultId": "b4204c74-7690-4523-be3d-5bea3c95dac0",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "b4204c74-7690-4523-be3d-5bea3c95dac0",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.43
+            }
+          },
+          {
+            "resultId": "ddc3d544-0a0c-4f21-adfe-77ca185e2208",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "ddc3d544-0a0c-4f21-adfe-77ca185e2208",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.43
+            }
+          },
+          {
+            "resultId": "46e26038-eae5-4c57-bf1e-c5579944730b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "46e26038-eae5-4c57-bf1e-c5579944730b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.43
+            }
+          },
+          {
+            "resultId": "8d5a4167-50bd-43f5-af1b-d303a5ba8a19",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "8d5a4167-50bd-43f5-af1b-d303a5ba8a19",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.43
+            }
+          },
+          {
+            "resultId": "997c2844-74f2-4de4-9e5d-7a097bcccf92",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "997c2844-74f2-4de4-9e5d-7a097bcccf92",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.43
+            }
+          }
+        ],
+        "latencyMs": 150,
+        "category": "accuracy"
+      },
+      {
+        "label": "route optimization",
+        "query": "barcode route optimization dispatch",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "routing_module.md",
+          "routing_module.md",
+          "routing_module.md",
+          "routing_module.md",
+          "video_record_05.mp4"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "4af5946e-13d6-4a58-a0a5-4ccc7f8ddd87",
+            "documentId": "20792896-22f0-4e7b-86d8-1b5a430c24b2",
+            "chunkId": "4af5946e-13d6-4a58-a0a5-4ccc7f8ddd87",
+            "title": "routing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.93,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "033a4356-c04d-4d53-a054-6c9bc170d09a",
+            "documentId": "20792896-22f0-4e7b-86d8-1b5a430c24b2",
+            "chunkId": "033a4356-c04d-4d53-a054-6c9bc170d09a",
+            "title": "routing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.81,
+              "sourceQuality": 0.83,
+              "final": 0.87
+            }
+          },
+          {
+            "resultId": "7878c6f5-9a6a-4689-8751-6fe54a8bf5a5",
+            "documentId": "20792896-22f0-4e7b-86d8-1b5a430c24b2",
+            "chunkId": "7878c6f5-9a6a-4689-8751-6fe54a8bf5a5",
+            "title": "routing_module.md",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 0.93,
+              "graph": 0,
+              "entity": 0.81,
+              "sourceQuality": 0.84,
+              "final": 0.84
+            }
+          },
+          {
+            "resultId": "79c820c4-7632-435a-abf2-43928d2118a6",
+            "documentId": "20792896-22f0-4e7b-86d8-1b5a430c24b2",
+            "chunkId": "79c820c4-7632-435a-abf2-43928d2118a6",
+            "title": "routing_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.84,
+              "graph": 0,
+              "entity": 0.94,
+              "sourceQuality": 0.85,
+              "final": 0.83
+            }
+          },
+          {
+            "resultId": "05afea26-615d-46a9-aa24-8ba0ec2c1f81",
+            "documentId": "8a3cd9b7-6ef5-45f0-bdaf-5fc5b8f96897",
+            "chunkId": "05afea26-615d-46a9-aa24-8ba0ec2c1f81",
+            "title": "video_record_05.mp4",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.18,
+              "graph": 0,
+              "entity": 0.12,
+              "sourceQuality": 0.98,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "b8500dfe-2b1c-4b0b-a622-aa1709255357",
+            "documentId": "52b7915b-9a9c-4daa-85cb-a642438ed997",
+            "chunkId": "b8500dfe-2b1c-4b0b-a622-aa1709255357",
+            "title": "video_record_04.mp4",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.18,
+              "graph": 0,
+              "entity": 0.12,
+              "sourceQuality": 0.96,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "b2b1326a-562c-411d-9752-b775686f611b",
+            "documentId": "8ff9c5a9-9c60-4f85-8142-7fda27f7a6e9",
+            "chunkId": "b2b1326a-562c-411d-9752-b775686f611b",
+            "title": "video_record_03.mp4",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.18,
+              "graph": 0,
+              "entity": 0.12,
+              "sourceQuality": 0.95,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "39738ddf-9c9b-4b30-b48f-f3285507df7b",
+            "documentId": "124b214e-c704-4c13-9fb6-c6ad55e720fd",
+            "chunkId": "39738ddf-9c9b-4b30-b48f-f3285507df7b",
+            "title": "video_record_02.mp4",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.18,
+              "graph": 0,
+              "entity": 0.12,
+              "sourceQuality": 0.93,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "acda4d9a-36e9-4999-93b1-0b36e47f7eb9",
+            "documentId": "90dde619-4350-4fa8-a51c-5eb430e6096e",
+            "chunkId": "acda4d9a-36e9-4999-93b1-0b36e47f7eb9",
+            "title": "video_record_01.mp4",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.18,
+              "graph": 0,
+              "entity": 0.12,
+              "sourceQuality": 0.92,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "d61b8d42-68ef-4c66-9000-29f5644366db",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "d61b8d42-68ef-4c66-9000-29f5644366db",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          }
+        ],
+        "latencyMs": 114,
+        "category": "accuracy"
+      },
+      {
+        "label": "slotting reserve",
+        "query": "warehouse slotting inventory reserve",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "inventory_module.md",
+          "inventory_module.md",
+          "inventory_module.md",
+          "inventory_module.md",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "9ba63180-8107-4a55-adcf-9463930710fc",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "9ba63180-8107-4a55-adcf-9463930710fc",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.72,
+              "sourceQuality": 0.87,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "5591c53f-141c-4a7f-aa2c-259c72e24f59",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "5591c53f-141c-4a7f-aa2c-259c72e24f59",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.86,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.85,
+              "final": 0.84
+            }
+          },
+          {
+            "resultId": "652d2564-c9c0-473d-84e1-2279ad56a84b",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "652d2564-c9c0-473d-84e1-2279ad56a84b",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.5,
+              "sourceQuality": 0.88,
+              "final": 0.83
+            }
+          },
+          {
+            "resultId": "75d96590-114b-407a-80e7-7fae823b4587",
+            "documentId": "317f2cfb-dc52-43ec-ad25-d1ec5b6586b4",
+            "chunkId": "75d96590-114b-407a-80e7-7fae823b4587",
+            "title": "inventory_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.92,
+              "graph": 0,
+              "entity": 0.5,
+              "sourceQuality": 0.86,
+              "final": 0.81
+            }
+          },
+          {
+            "resultId": "3fa15ad5-7819-4f98-b47f-902619e76b2c",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "3fa15ad5-7819-4f98-b47f-902619e76b2c",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          },
+          {
+            "resultId": "c4e80dd3-7a8a-4a49-8faf-88b25a98f9c4",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c4e80dd3-7a8a-4a49-8faf-88b25a98f9c4",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          },
+          {
+            "resultId": "80edf651-3910-404f-83f0-a8fe9dd738fe",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "80edf651-3910-404f-83f0-a8fe9dd738fe",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          },
+          {
+            "resultId": "c5cc5748-2d0b-4799-bd8f-84a92cce4c77",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c5cc5748-2d0b-4799-bd8f-84a92cce4c77",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          },
+          {
+            "resultId": "c489ce4d-2cff-4108-b648-419aaaf1b9d9",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c489ce4d-2cff-4108-b648-419aaaf1b9d9",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          },
+          {
+            "resultId": "e0ce3afc-8c52-44ae-b4ba-d826c9b6ece6",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "e0ce3afc-8c52-44ae-b4ba-d826c9b6ece6",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.94,
+              "final": 0.4
+            }
+          }
+        ],
+        "latencyMs": 182,
+        "category": "accuracy"
+      },
+      {
+        "label": "webhook retry",
+        "query": "email webhook retry notification",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "notifications_module.md",
+          "notifications_module.md",
+          "notifications_module.md",
+          "notifications_module.md",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "f9f9c9c3-6525-46a9-9c5f-4df737e9b11f",
+            "documentId": "f2321a15-3561-4dfa-b421-cacabb99af82",
+            "chunkId": "f9f9c9c3-6525-46a9-9c5f-4df737e9b11f",
+            "title": "notifications_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.9,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.82,
+              "final": 0.86
+            }
+          },
+          {
+            "resultId": "c4631cc1-2400-4d8f-afdb-1ab23794ccb4",
+            "documentId": "f2321a15-3561-4dfa-b421-cacabb99af82",
+            "chunkId": "c4631cc1-2400-4d8f-afdb-1ab23794ccb4",
+            "title": "notifications_module.md",
+            "scoreBreakdown": {
+              "vector": 0.95,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.84,
+              "final": 0.83
+            }
+          },
+          {
+            "resultId": "fe88f958-12df-4847-8c4f-0f2e9acb74d3",
+            "documentId": "f2321a15-3561-4dfa-b421-cacabb99af82",
+            "chunkId": "fe88f958-12df-4847-8c4f-0f2e9acb74d3",
+            "title": "notifications_module.md",
+            "scoreBreakdown": {
+              "vector": 0.95,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.84,
+              "final": 0.83
+            }
+          },
+          {
+            "resultId": "8ca24c86-67ae-48d6-b9cb-5487ebcddfb1",
+            "documentId": "f2321a15-3561-4dfa-b421-cacabb99af82",
+            "chunkId": "8ca24c86-67ae-48d6-b9cb-5487ebcddfb1",
+            "title": "notifications_module.md",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0.8,
+              "graph": 0,
+              "entity": 0.58,
+              "sourceQuality": 0.84,
+              "final": 0.76
+            }
+          },
+          {
+            "resultId": "5b691d17-92f1-40c3-ab37-462d509eb12f",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5b691d17-92f1-40c3-ab37-462d509eb12f",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "5082ac91-535b-403e-a5bf-300f52db67a4",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5082ac91-535b-403e-a5bf-300f52db67a4",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "bc7ba665-44f7-40ba-a44d-4bddb4dfe9b4",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "bc7ba665-44f7-40ba-a44d-4bddb4dfe9b4",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "1c5752bd-ba97-4d54-84c8-184486d2622f",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "1c5752bd-ba97-4d54-84c8-184486d2622f",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0.99,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "a90c2ecd-103d-483b-ac52-ffe90ab673b8",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "a90c2ecd-103d-483b-ac52-ffe90ab673b8",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          }
+        ],
+        "latencyMs": 154,
+        "category": "accuracy"
+      },
+      {
+        "label": "session token",
+        "query": "session refresh token auth gate",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "auth_module.md",
+          "auth_module.md",
+          "auth_module.md",
+          "auth_module.md",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "33a51b09-b8bf-4cc7-9959-f400f9051eca",
+            "documentId": "35b74c63-f16d-4b44-9946-584e69cd0f1e",
+            "chunkId": "33a51b09-b8bf-4cc7-9959-f400f9051eca",
+            "title": "auth_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.91,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "4bcae7b0-3e54-4967-bfd9-0cc53906c37f",
+            "documentId": "35b74c63-f16d-4b44-9946-584e69cd0f1e",
+            "chunkId": "4bcae7b0-3e54-4967-bfd9-0cc53906c37f",
+            "title": "auth_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.9,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "79bf9efb-0874-43c3-9715-82ab6a224951",
+            "documentId": "35b74c63-f16d-4b44-9946-584e69cd0f1e",
+            "chunkId": "79bf9efb-0874-43c3-9715-82ab6a224951",
+            "title": "auth_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.88,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.86,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "ffd4767f-acc5-484f-b5bf-66b34218b555",
+            "documentId": "35b74c63-f16d-4b44-9946-584e69cd0f1e",
+            "chunkId": "ffd4767f-acc5-484f-b5bf-66b34218b555",
+            "title": "auth_module.md",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.84,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.91,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "2296afe2-6ae8-4f10-8160-ceb78105a4b2",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "2296afe2-6ae8-4f10-8160-ceb78105a4b2",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.88,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.08,
+              "sourceQuality": 1,
+              "final": 0.56
+            }
+          },
+          {
+            "resultId": "536448fc-e913-4d7c-b798-355ad3a10c62",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "536448fc-e913-4d7c-b798-355ad3a10c62",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.88,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.08,
+              "sourceQuality": 1,
+              "final": 0.56
+            }
+          },
+          {
+            "resultId": "559c5dca-0729-48ff-90df-b86272753737",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "559c5dca-0729-48ff-90df-b86272753737",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.88,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.08,
+              "sourceQuality": 1,
+              "final": 0.56
+            }
+          },
+          {
+            "resultId": "00d5d717-0cf4-4480-87d3-61da8990fa2a",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "00d5d717-0cf4-4480-87d3-61da8990fa2a",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.88,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.08,
+              "sourceQuality": 0.99,
+              "final": 0.56
+            }
+          },
+          {
+            "resultId": "69fae7fb-5e0d-452b-9ba5-bae36f0d4a88",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "69fae7fb-5e0d-452b-9ba5-bae36f0d4a88",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.88,
+              "bm25": 0,
+              "graph": 0.99,
+              "entity": 0.08,
+              "sourceQuality": 0.99,
+              "final": 0.56
+            }
+          },
+          {
+            "resultId": "27858066-902d-4a47-84b5-c4094ec3dca9",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "27858066-902d-4a47-84b5-c4094ec3dca9",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.87,
+              "bm25": 0.05,
+              "graph": 0,
+              "entity": 0.08,
+              "sourceQuality": 0.99,
+              "final": 0.42
+            }
+          }
+        ],
+        "latencyMs": 163,
+        "category": "accuracy"
+      },
+      {
+        "label": "pick pack wave",
+        "query": "pick pack wave fulfillment",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.6,
+        "precisionAt10": 0.3,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "fulfillment_module.md",
+          "fulfillment_module.md",
+          "fulfillment_module.md",
+          "activity_log.csv",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "3682a9b1-638d-4d71-b46d-6c34792210a0",
+            "documentId": "cd3bcdf2-e6a6-41b9-930a-64191a89eb3d",
+            "chunkId": "3682a9b1-638d-4d71-b46d-6c34792210a0",
+            "title": "fulfillment_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.79,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "a56dad22-d82c-4099-9406-6445576e5544",
+            "documentId": "cd3bcdf2-e6a6-41b9-930a-64191a89eb3d",
+            "chunkId": "a56dad22-d82c-4099-9406-6445576e5544",
+            "title": "fulfillment_module.md",
+            "scoreBreakdown": {
+              "vector": 0.95,
+              "bm25": 0.87,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.84,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "f33e2b39-e253-4233-ada9-a1cecd76b50b",
+            "documentId": "cd3bcdf2-e6a6-41b9-930a-64191a89eb3d",
+            "chunkId": "f33e2b39-e253-4233-ada9-a1cecd76b50b",
+            "title": "fulfillment_module.md",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.86,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.84,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "f6790523-cd36-4b66-bd39-af0584935879",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "f6790523-cd36-4b66-bd39-af0584935879",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "13284352-5a8d-4287-af04-bf913721fc8e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "13284352-5a8d-4287-af04-bf913721fc8e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "27dc83c1-0f87-4cfd-824f-971c99c550f8",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "27dc83c1-0f87-4cfd-824f-971c99c550f8",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "5297e3a5-8b0f-421c-bb70-7ed0c344741e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5297e3a5-8b0f-421c-bb70-7ed0c344741e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "b954d77f-dc88-4d59-bbbd-0123005511ae",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "b954d77f-dc88-4d59-bbbd-0123005511ae",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "830d4c53-583d-4686-84b4-e093fbb9c332",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "830d4c53-583d-4686-84b4-e093fbb9c332",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "8ad6cb17-0ffc-4711-9d9e-ee5964eca5fc",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "8ad6cb17-0ffc-4711-9d9e-ee5964eca5fc",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0.98,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          }
+        ],
+        "latencyMs": 189,
+        "category": "accuracy"
+      },
+      {
+        "label": "offline scan",
+        "query": "offline scan sync mobile",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "mobile_module.md",
+          "mobile_module.md",
+          "mobile_module.md",
+          "mobile_module.md",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "7682ea18-e593-439e-89e1-c1b30b35e4b2",
+            "documentId": "354accc7-8e89-4b5b-8887-4829999f4e66",
+            "chunkId": "7682ea18-e593-439e-89e1-c1b30b35e4b2",
+            "title": "mobile_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.92,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.83,
+              "final": 0.86
+            }
+          },
+          {
+            "resultId": "e0e0c7e4-6618-4f39-8c99-eab81a11c530",
+            "documentId": "354accc7-8e89-4b5b-8887-4829999f4e66",
+            "chunkId": "e0e0c7e4-6618-4f39-8c99-eab81a11c530",
+            "title": "mobile_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.84,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "042493e7-2432-40ec-8c93-780e2a3f69c2",
+            "documentId": "354accc7-8e89-4b5b-8887-4829999f4e66",
+            "chunkId": "042493e7-2432-40ec-8c93-780e2a3f69c2",
+            "title": "mobile_module.md",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.84,
+              "final": 0.85
+            }
+          },
+          {
+            "resultId": "7ebdc956-b609-4c31-958a-dcf17048f011",
+            "documentId": "354accc7-8e89-4b5b-8887-4829999f4e66",
+            "chunkId": "7ebdc956-b609-4c31-958a-dcf17048f011",
+            "title": "mobile_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.81,
+              "graph": 0,
+              "entity": 0.7,
+              "sourceQuality": 0.84,
+              "final": 0.79
+            }
+          },
+          {
+            "resultId": "c1c65145-b94c-46f3-b2eb-b1420c4f2ac0",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "c1c65145-b94c-46f3-b2eb-b1420c4f2ac0",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0.06,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.58
+            }
+          },
+          {
+            "resultId": "34a29fb1-7b6b-49c3-a6fd-adbc10fb0d18",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "34a29fb1-7b6b-49c3-a6fd-adbc10fb0d18",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.21,
+              "sourceQuality": 1,
+              "final": 0.58
+            }
+          },
+          {
+            "resultId": "05d58e2d-f5bf-4c83-a989-858ca0fbb0cb",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "05d58e2d-f5bf-4c83-a989-858ca0fbb0cb",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0.21,
+              "sourceQuality": 0.99,
+              "final": 0.58
+            }
+          },
+          {
+            "resultId": "9a84ec1e-d710-4557-b865-78c9b2e4af1e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "9a84ec1e-d710-4557-b865-78c9b2e4af1e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0,
+              "graph": 0.99,
+              "entity": 0.21,
+              "sourceQuality": 0.99,
+              "final": 0.58
+            }
+          },
+          {
+            "resultId": "3128ff64-3fb1-441f-abf7-c4307d803248",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "3128ff64-3fb1-441f-abf7-c4307d803248",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0.06,
+              "graph": 0,
+              "entity": 0.21,
+              "sourceQuality": 1,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5d83dd99-0424-4f1a-a565-3662478b449e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0.21,
+              "sourceQuality": 0.99,
+              "final": 0.44
+            }
+          }
+        ],
+        "latencyMs": 164,
+        "category": "accuracy"
+      },
+      {
+        "label": "alert error",
+        "query": "ALERT conveyor thermal threshold",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.2,
+        "precisionAt10": 0.1,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "syslog_07.txt",
+          "activity_log.csv",
+          "activity_log.csv",
+          "activity_log.csv",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "e29ee2b5-106e-4814-820f-6259b3158f03",
+            "documentId": "08f0b0c9-4a16-4572-a003-0a5f45859be6",
+            "chunkId": "e29ee2b5-106e-4814-820f-6259b3158f03",
+            "title": "syslog_07.txt",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.77,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "26c42b81-e901-44fd-9d01-435bcc9272eb",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "26c42b81-e901-44fd-9d01-435bcc9272eb",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.22,
+              "graph": 0,
+              "entity": 0.18,
+              "sourceQuality": 0.99,
+              "final": 0.51
+            }
+          },
+          {
+            "resultId": "a63e938f-fe28-4e7f-af5e-89bc8d986abf",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "a63e938f-fe28-4e7f-af5e-89bc8d986abf",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.22,
+              "graph": 0,
+              "entity": 0.04,
+              "sourceQuality": 0.99,
+              "final": 0.5
+            }
+          },
+          {
+            "resultId": "2a388a00-d1d5-4b88-bfac-292887bcefd0",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "2a388a00-d1d5-4b88-bfac-292887bcefd0",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.22,
+              "graph": 0,
+              "entity": 0.04,
+              "sourceQuality": 0.98,
+              "final": 0.49
+            }
+          },
+          {
+            "resultId": "7effedd6-aa6f-479f-8fcc-aeb93b6249b9",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "7effedd6-aa6f-479f-8fcc-aeb93b6249b9",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.22,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.87,
+              "final": 0.48
+            }
+          },
+          {
+            "resultId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0.19,
+              "graph": 0,
+              "entity": 0.18,
+              "sourceQuality": 0.84,
+              "final": 0.48
+            }
+          },
+          {
+            "resultId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "documentId": "2b52a185-6d16-48d4-8cf9-f0da9e5b155b",
+            "chunkId": "88c7d211-5c85-4682-9ce9-02f2fcb10f4c",
+            "title": "syslog_03.txt",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0.15,
+              "graph": 0,
+              "entity": 0.04,
+              "sourceQuality": 0.79,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.91,
+              "bm25": 0.12,
+              "graph": 0,
+              "entity": 0.09,
+              "sourceQuality": 0.89,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "5297e3a5-8b0f-421c-bb70-7ed0c344741e",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5297e3a5-8b0f-421c-bb70-7ed0c344741e",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "04b9fdf2-9ae7-4a79-ad24-37b985bf1c1b",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "04b9fdf2-9ae7-4a79-ad24-37b985bf1c1b",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.89,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.98,
+              "final": 0.41
+            }
+          }
+        ],
+        "latencyMs": 182,
+        "category": "accuracy"
+      },
+      {
+        "label": "invoice approval",
+        "query": "VID-APPROVAL-005 invoice approval",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.4,
+        "precisionAt10": 0.2,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "img_invoice_02.png",
+          "img_invoice_02.png",
+          "video_record_05.mp4",
+          "video_record_03.mp4",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "2ba24af2-714e-47b8-ab78-14735893ecfb",
+            "documentId": "56cd3e62-893c-41c9-bfed-bc02db3ae660",
+            "chunkId": "2ba24af2-714e-47b8-ab78-14735893ecfb",
+            "title": "img_invoice_02.png",
+            "scoreBreakdown": {
+              "vector": 0.99,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.9,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "65677212-e8bb-41af-a09b-2db8020da02e",
+            "documentId": "56cd3e62-893c-41c9-bfed-bc02db3ae660",
+            "chunkId": "65677212-e8bb-41af-a09b-2db8020da02e",
+            "title": "img_invoice_02.png",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.97,
+              "graph": 0,
+              "entity": 0.76,
+              "sourceQuality": 0.89,
+              "final": 0.86
+            }
+          },
+          {
+            "resultId": "05afea26-615d-46a9-aa24-8ba0ec2c1f81",
+            "documentId": "8a3cd9b7-6ef5-45f0-bdaf-5fc5b8f96897",
+            "chunkId": "05afea26-615d-46a9-aa24-8ba0ec2c1f81",
+            "title": "video_record_05.mp4",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0.28,
+              "graph": 0,
+              "entity": 0.05,
+              "sourceQuality": 0.98,
+              "final": 0.52
+            }
+          },
+          {
+            "resultId": "b2b1326a-562c-411d-9752-b775686f611b",
+            "documentId": "8ff9c5a9-9c60-4f85-8142-7fda27f7a6e9",
+            "chunkId": "b2b1326a-562c-411d-9752-b775686f611b",
+            "title": "video_record_03.mp4",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0.14,
+              "graph": 0,
+              "entity": 0.05,
+              "sourceQuality": 0.95,
+              "final": 0.47
+            }
+          },
+          {
+            "resultId": "05f20dda-1352-4cb0-aaa4-b345b5355142",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "05f20dda-1352-4cb0-aaa4-b345b5355142",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0.09,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.91,
+              "final": 0.46
+            }
+          },
+          {
+            "resultId": "69fae7fb-5e0d-452b-9ba5-bae36f0d4a88",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "69fae7fb-5e0d-452b-9ba5-bae36f0d4a88",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.42
+            }
+          },
+          {
+            "resultId": "2296afe2-6ae8-4f10-8160-ceb78105a4b2",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "2296afe2-6ae8-4f10-8160-ceb78105a4b2",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.93,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.42
+            }
+          },
+          {
+            "resultId": "3922155c-2109-42e1-a92d-a1ae94589bda",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "3922155c-2109-42e1-a92d-a1ae94589bda",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.92,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.42
+            }
+          },
+          {
+            "resultId": "6eb4d244-c76f-4a4f-8395-d16d75c1d101",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "6eb4d244-c76f-4a4f-8395-d16d75c1d101",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.93,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.42
+            }
+          },
+          {
+            "resultId": "c489ce4d-2cff-4108-b648-419aaaf1b9d9",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "c489ce4d-2cff-4108-b648-419aaaf1b9d9",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.93,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.92,
+              "final": 0.42
+            }
+          }
+        ],
+        "latencyMs": 166,
+        "category": "graph"
+      },
+      {
+        "label": "surya node",
+        "query": "SHIP-NODE-SURYA cooling lane",
+        "recallAtK": 1,
+        "precisionAtK": 0.4,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.4,
+        "precisionAt10": 0.5,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "shipping_module.md",
+          "inventory_audit.json",
+          "activity_log.csv",
+          "activity_log.csv",
+          "activity_log.csv"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "ea670acc-5680-4b80-9401-7e8cfec86844",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 0.56,
+              "sourceQuality": 0.84,
+              "final": 0.84
+            }
+          },
+          {
+            "resultId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "360185e0-a1ad-403f-a8f9-c9ca8b444c8b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 0.88,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.89,
+              "final": 0.82
+            }
+          },
+          {
+            "resultId": "15c72a61-147a-4992-8bd1-0c80e1efbc38",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "15c72a61-147a-4992-8bd1-0c80e1efbc38",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.34,
+              "graph": 0.99,
+              "entity": 0.7,
+              "sourceQuality": 0.99,
+              "final": 0.78
+            }
+          },
+          {
+            "resultId": "eb32defa-6196-478b-ae55-0acab8d33734",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "eb32defa-6196-478b-ae55-0acab8d33734",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.34,
+              "graph": 1,
+              "entity": 0.7,
+              "sourceQuality": 0.99,
+              "final": 0.78
+            }
+          },
+          {
+            "resultId": "249b51a5-7d94-409a-a81f-dd99e42fc8f1",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "249b51a5-7d94-409a-a81f-dd99e42fc8f1",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.98,
+              "bm25": 0.33,
+              "graph": 1,
+              "entity": 0.7,
+              "sourceQuality": 0.99,
+              "final": 0.78
+            }
+          },
+          {
+            "resultId": "fa4d8c94-ff0c-48e8-ba15-d30ed31f80bd",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "fa4d8c94-ff0c-48e8-ba15-d30ed31f80bd",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.33,
+              "graph": 1,
+              "entity": 0.7,
+              "sourceQuality": 0.98,
+              "final": 0.77
+            }
+          },
+          {
+            "resultId": "5c08fcd3-02eb-4106-9cb0-cc441a056141",
+            "documentId": "5911c11e-4edb-4e3c-b4af-90af49a77129",
+            "chunkId": "5c08fcd3-02eb-4106-9cb0-cc441a056141",
+            "title": "activity_log.csv",
+            "scoreBreakdown": {
+              "vector": 0.97,
+              "bm25": 0.33,
+              "graph": 0.99,
+              "entity": 0.7,
+              "sourceQuality": 0.99,
+              "final": 0.77
+            }
+          },
+          {
+            "resultId": "b46052ed-6023-4e62-bc3f-7ebce71fa1a3",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "b46052ed-6023-4e62-bc3f-7ebce71fa1a3",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.56,
+              "graph": 0,
+              "entity": 0.79,
+              "sourceQuality": 0.86,
+              "final": 0.7
+            }
+          },
+          {
+            "resultId": "b98876cc-8a65-492b-bb8b-cf686af8c862",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "b98876cc-8a65-492b-bb8b-cf686af8c862",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.62,
+              "graph": 0,
+              "entity": 0.51,
+              "sourceQuality": 0.84,
+              "final": 0.7
+            }
+          },
+          {
+            "resultId": "a2d6befa-a081-463a-b52d-b5edf0f76268",
+            "documentId": "43d20a63-18c1-4004-b8a0-d7080acef6e0",
+            "chunkId": "a2d6befa-a081-463a-b52d-b5edf0f76268",
+            "title": "shipping_module.md",
+            "scoreBreakdown": {
+              "vector": 0.96,
+              "bm25": 0.61,
+              "graph": 0,
+              "entity": 0.51,
+              "sourceQuality": 0.84,
+              "final": 0.69
+            }
+          }
+        ],
+        "latencyMs": 158,
+        "category": "graph"
+      },
+      {
+        "label": "retention audit",
+        "query": "retention policy audit compliance",
+        "recallAtK": 1,
+        "precisionAtK": 0.2,
+        "recallAt5": 1,
+        "recallAt10": 1,
+        "precisionAt5": 0.8,
+        "precisionAt10": 0.4,
+        "top1Accuracy": 1,
+        "top3Accuracy": 1,
+        "mrrAt10": 1,
+        "ndcgAt10": 1,
+        "queryStatus": "weak_pass",
+        "status": "PASS",
+        "missingRequired": [],
+        "topFilenames": [
+          "compliance_module.md",
+          "compliance_module.md",
+          "compliance_module.md",
+          "compliance_module.md",
+          "inventory_audit.json"
+        ],
+        "debugTopResults": [
+          {
+            "resultId": "91fbe50c-ecae-4660-8e0a-cfb941d41dff",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "91fbe50c-ecae-4660-8e0a-cfb941d41dff",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 1,
+              "bm25": 1,
+              "graph": 0,
+              "entity": 1,
+              "sourceQuality": 0.75,
+              "final": 0.89
+            }
+          },
+          {
+            "resultId": "35aae329-1480-4882-8ec3-f226e01ae7a5",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "35aae329-1480-4882-8ec3-f226e01ae7a5",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0.81,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.83,
+              "final": 0.77
+            }
+          },
+          {
+            "resultId": "d26dad4e-e70f-42c7-a5c0-2729c210d807",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "d26dad4e-e70f-42c7-a5c0-2729c210d807",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 0.94,
+              "bm25": 0.81,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.82,
+              "final": 0.77
+            }
+          },
+          {
+            "resultId": "430ee4b8-237a-4dd1-8ce8-0b215872b33c",
+            "documentId": "822c92a4-b5cd-4c27-be72-56e4a5468dd2",
+            "chunkId": "430ee4b8-237a-4dd1-8ce8-0b215872b33c",
+            "title": "compliance_module.md",
+            "scoreBreakdown": {
+              "vector": 0.95,
+              "bm25": 0.66,
+              "graph": 0,
+              "entity": 0.65,
+              "sourceQuality": 0.8,
+              "final": 0.72
+            }
+          },
+          {
+            "resultId": "8d5a4167-50bd-43f5-af1b-d303a5ba8a19",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "8d5a4167-50bd-43f5-af1b-d303a5ba8a19",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "b7f80e28-dbf0-4795-bf26-07514509407b",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "b7f80e28-dbf0-4795-bf26-07514509407b",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 0.99,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "94b261bf-4362-4a90-9ddf-26e739f32a9f",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "94b261bf-4362-4a90-9ddf-26e739f32a9f",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "bd8bf8d2-ad1f-4cfe-badb-f6ef3d4ed5a7",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "bd8bf8d2-ad1f-4cfe-badb-f6ef3d4ed5a7",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "88409e9a-b78e-4daf-abe5-e00cf3a3f4da",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "88409e9a-b78e-4daf-abe5-e00cf3a3f4da",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 0,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          },
+          {
+            "resultId": "0b183c5e-4b28-42e7-b3cb-a2bfeee93d97",
+            "documentId": "b9bdcb76-3e08-42b5-893a-c1c6f75c6153",
+            "chunkId": "0b183c5e-4b28-42e7-b3cb-a2bfeee93d97",
+            "title": "inventory_audit.json",
+            "scoreBreakdown": {
+              "vector": 0.9,
+              "bm25": 0,
+              "graph": 1,
+              "entity": 0,
+              "sourceQuality": 1,
+              "final": 0.41
+            }
+          }
+        ],
+        "latencyMs": 179,
+        "category": "accuracy"
+      }
+    ],
+    "sourceFileCount": 52,
+    "scale": "quick"
+  },
+  "keepRevertRuleDecision": {
+    "precedence": "revertIfAny > keepIfAny > default",
+    "revertMatches": [
+      "latency-regression"
+    ],
+    "keepMatches": [],
+    "final": "revert"
+  }
+}

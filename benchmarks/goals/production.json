@@ -7,15 +7,15 @@
     "contract": "Fields aqi, retrieval, latency, security are read by bin/experiment.js. Do not rename or move them. New fields (baseline, priorities, keepRevertRules, stopCondition, loop) are read by the codex orchestrator."
   },
   "aqi": {
-    "target": 85,
-    "hardMinimum": 80
+    "target": 95,
+    "hardMinimum": 90
   },
   "retrieval": {
-    "recallAt10": 0.92,
-    "precisionAt10": 0.45,
-    "top3Accuracy": 0.8,
-    "mrrAt10": 0.7,
-    "ndcgAt10": 0.75,
+    "recallAt10": 0.95,
+    "precisionAt10": 0.5,
+    "top3Accuracy": 0.95,
+    "mrrAt10": 0.9,
+    "ndcgAt10": 0.9,
     "criticalFailures": 0
   },
   "latency": {
@@ -35,7 +35,7 @@
   },
   "grounding": {
     "sourceCoverage": 0.95,
-    "edgeEvidenceCoverage": 0.9
+    "edgeEvidenceCoverage": 0.95
   },
   "security": {
     "permissionLeakage": 0,
@@ -50,17 +50,17 @@
     "indexingCrashMaxAqi": 70
   },
   "baseline": {
-    "ref": "benchmarks/baselines/current-alpha-2026-05-23-0012-doc-cap-after-fanout.json",
-    "lastExperiment": "experiments/0012-doc-cap-after-fanout",
+    "ref": "benchmarks/baselines/current-alpha-2026-05-23-0027-graph-fanout-two.json",
+    "lastExperiment": "experiments/0027-graph-fanout-two",
     "snapshot": {
-      "aqi": 81,
-      "recallAt10": 0.96,
-      "precisionAt10": 0.38,
-      "top3Accuracy": 0.93,
-      "mrrAt10": 0.94,
-      "ndcgAt10": 0.94,
-      "p95LatencyMs": 239,
-      "p99LatencyMs": 239,
+      "aqi": 87.9,
+      "recallAt10": 0.98,
+      "precisionAt10": 0.39,
+      "top3Accuracy": 1,
+      "mrrAt10": 1,
+      "ndcgAt10": 0.98,
+      "p95LatencyMs": 177,
+      "p99LatencyMs": 177,
       "criticalFailures": 0,
       "permissionLeakage": 0,
       "graphEdgesPerChunk": 69.86,
@@ -80,24 +80,24 @@
     {
       "rank": 2,
       "metric": "retrieval.precisionAt10",
-      "current": 0.38,
-      "target": 0.45,
-      "gap": 0.07,
+      "current": 0.39,
+      "target": 0.5,
+      "gap": 0.11,
       "rationale": "Largest quality gap not yet at production. Score breakdowns show bottom-half of top-10 is graph-only or entity-only hits with weak BM25 / vector signal — candidates for downranking, pruning, or rerank."
     },
     {
       "rank": 3,
       "metric": "aqi",
-      "current": 81,
-      "target": 85,
-      "gap": 4,
+      "current": 87.9,
+      "target": 95,
+      "gap": 7.1,
       "rationale": "Composite. Moves as #1 and #2 land; do not optimise directly."
     },
     {
       "rank": 4,
       "metric": "retrieval.recallAt10",
-      "current": 0.96,
-      "target": 0.92,
+      "current": 0.98,
+      "target": 0.95,
       "gap": 0,
       "rationale": "Close — protect, do not regress. Final push only after precision is at target."
     },
@@ -105,8 +105,8 @@
       "rank": 5,
       "metric": "grounding.edgeEvidenceCoverage",
       "current": 0.04,
-      "target": 0.9,
-      "gap": 0.86,
+      "target": 0.95,
+      "gap": 0.91,
       "rationale": "Evidence is computed on read; baseline coverage 4%. Needs evidence persisted on write or a coverage walker before this can move."
     },
     {
@@ -168,7 +168,7 @@
     "precedence": "revertIfAny > keepIfAny > default"
   },
   "stopCondition": {
-    "description": "Engine is production-ready when every productionChecks entry from bin/experiment.js passes against the quick suite AND AQI clears 85 without a hard-gate cap.",
+    "description": "Engine is production-ready when every productionChecks entry from bin/experiment.js passes against the quick suite AND AQI clears 95 with a 90 hard minimum and without a hard-gate cap.",
     "allOf": [
       "productionChecks.aqi.pass",
       "productionChecks.recallAt10.pass",

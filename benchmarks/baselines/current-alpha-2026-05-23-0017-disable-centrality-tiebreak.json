@@ -1,0 +1,41 @@
+{
+  "name": "current-alpha-2026-05-23-0017-disable-centrality-tiebreak",
+  "aqi": 85.5,
+  "corpusScale": "quick",
+  "documents": 52,
+  "chunks": 420,
+  "edges": 29340,
+  "edgesPerChunk": 69.86,
+  "indexPassTimeSec": 26.14,
+  "throughputFilesPerSec": 2,
+  "throughputKbPerSec": 4.2,
+  "queryLatency": {
+    "averageMs": 171,
+    "p50Ms": 174,
+    "p95Ms": 216,
+    "p99Ms": 216
+  },
+  "retrieval": {
+    "averageRecallAtK": 0.98,
+    "averagePrecisionAtK": 0.25,
+    "recallAt10": 0.98,
+    "precisionAt10": 0.39,
+    "top3Accuracy": 1,
+    "mrrAt10": 0.97,
+    "ndcgAt10": 0.97,
+    "criticalFailures": 0,
+    "knownFailureQueries": []
+  },
+  "graph": {
+    "edgeEvidenceCoverage": 0.04,
+    "edgesPerChunk": 69.86
+  },
+  "security": {
+    "permissionLeakage": 0
+  },
+  "structuralAssertions": {
+    "graphEvidence": true,
+    "downrank": true,
+    "jsonChunking": true
+  }
+}
