@@ -267,4 +267,131 @@ mod tests {
         let states = registry.loaded_states().await;
         assert!(!states.contains_key(&id));
     }
+
+    #[tokio::test]
+    async fn two_workdirs_have_disjoint_corpora() {
+        // Insert a document into each workdir's DB directly (bypassing the
+        // indexer, which pulls in tauri runtime symbols that the lib-test
+        // binary can't load on Windows) and confirm the corpora are disjoint.
+        let (_root, registry) = fresh_registry().await;
+
+        let wd_a = tempfile::tempdir().expect("workdir A");
+        let wd_b = tempfile::tempdir().expect("workdir B");
+
+        let (_, state_a) = registry
+            .get_or_load(wd_a.path().to_str().unwrap())
+            .await
+            .expect("load A");
+        let (_, state_b) = registry
+            .get_or_load(wd_b.path().to_str().unwrap())
+            .await
+            .expect("load B");
+
+        let doc_a = crate::store::db::DocumentRecord {
+            id: "doc-a".to_string(),
+            path: "/fake/alpha.txt".to_string(),
+            filename: "alpha.txt".to_string(),
+            format: crate::types::DocFormat::Text,
+            size_bytes: 18,
+            hash: "hash-a".to_string(),
+            indexed_at: chrono::Utc::now().to_rfc3339(),
+            status: "indexed".to_string(),
+            error_msg: None,
+            doc_class: crate::types::DocClass::Content,
+        };
+        let doc_b = crate::store::db::DocumentRecord {
+            id: "doc-b".to_string(),
+            path: "/fake/bravo.txt".to_string(),
+            filename: "bravo.txt".to_string(),
+            format: crate::types::DocFormat::Text,
+            size_bytes: 18,
+            hash: "hash-b".to_string(),
+            indexed_at: chrono::Utc::now().to_rfc3339(),
+            status: "indexed".to_string(),
+            error_msg: None,
+            doc_class: crate::types::DocClass::Content,
+        };
+        {
+            let db = state_a.db.lock().await;
+            crate::store::db::upsert_document(&db, &doc_a).expect("upsert A");
+        }
+        {
+            let db = state_b.db.lock().await;
+            crate::store::db::upsert_document(&db, &doc_b).expect("upsert B");
+        }
+
+        let docs_a = {
+            let db = state_a.db.lock().await;
+            crate::store::db::list_documents(&db).expect("list A")
+        };
+        let docs_b = {
+            let db = state_b.db.lock().await;
+            crate::store::db::list_documents(&db).expect("list B")
+        };
+        let names_a: Vec<String> = docs_a
+            .iter()
+            .filter_map(|v| v.get("filename").and_then(|f| f.as_str()).map(String::from))
+            .collect();
+        let names_b: Vec<String> = docs_b
+            .iter()
+            .filter_map(|v| v.get("filename").and_then(|f| f.as_str()).map(String::from))
+            .collect();
+        assert_eq!(names_a, vec!["alpha.txt".to_string()]);
+        assert_eq!(names_b, vec!["bravo.txt".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn registry_starts_empty_and_loads_on_demand() {
+        let (_root, registry) = fresh_registry().await;
+        {
+            let states = registry.loaded_states().await;
+            assert_eq!(states.len(), 0, "expected empty cache at start");
+        }
+
+        let w1 = tempfile::tempdir().unwrap();
+        let w2 = tempfile::tempdir().unwrap();
+        registry.get_or_load(w1.path().to_str().unwrap()).await.unwrap();
+        registry.get_or_load(w2.path().to_str().unwrap()).await.unwrap();
+
+        let states = registry.loaded_states().await;
+        assert_eq!(states.len(), 2, "expected two cached states");
+    }
+
+    #[tokio::test]
+    async fn nonexistent_path_returns_not_found() {
+        let (_root, registry) = fresh_registry().await;
+        let result = registry.get_or_load("Z:/definitely/does/not/exist").await;
+        let err = result.err().expect("must fail");
+        assert!(
+            matches!(err, EngineError::Workdir(WorkdirError::NotFound { .. })),
+            "expected NotFound, got {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn file_instead_of_dir_returns_not_found() {
+        let (root, registry) = fresh_registry().await;
+        let file = root.path().join("not-a-dir.txt");
+        std::fs::write(&file, "x").unwrap();
+        let result = registry.get_or_load(file.to_str().unwrap()).await;
+        let err = result.err().expect("must fail");
+        assert!(
+            matches!(err, EngineError::Workdir(WorkdirError::NotFound { .. })),
+            "expected NotFound, got {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn same_canonical_path_returns_same_state() {
+        let (_root, registry) = fresh_registry().await;
+
+        let wd = tempfile::tempdir().unwrap();
+        let path_a = wd.path().to_str().unwrap().to_string();
+        let path_b = format!("{}{}", path_a, std::path::MAIN_SEPARATOR);
+
+        let (id_a, state_a) = registry.get_or_load(&path_a).await.unwrap();
+        let (id_b, state_b) = registry.get_or_load(&path_b).await.unwrap();
+        assert_eq!(id_a, id_b);
+        assert!(Arc::ptr_eq(&state_a, &state_b));
+    }
 }
