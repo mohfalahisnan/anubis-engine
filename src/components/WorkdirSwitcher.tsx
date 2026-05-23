@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Check, ChevronDown, FolderPlus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -28,8 +29,19 @@ export default function WorkdirSwitcher() {
       title: "Pick a workdir to index into",
     });
     if (typeof selected === "string") {
-      setActiveWorkdir(selected);
-      await refreshKnownWorkdirs();
+      try {
+        // Round-trip through the backend so we use the canonical form of the
+        // path (on Windows the dialog returns `D:\foo` but canonicalize gives
+        // `\\?\D:\foo` — using the canonical form in localStorage + the
+        // dropdown keeps everything consistent).
+        const info = await invoke<WorkdirInfo>("register_workdir", {
+          workdir: selected,
+        });
+        setActiveWorkdir(info.path);
+        await refreshKnownWorkdirs();
+      } catch (reason) {
+        window.alert(`Failed to register workdir: ${reason}`);
+      }
     }
     setIsOpen(false);
   }

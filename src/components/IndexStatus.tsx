@@ -61,7 +61,13 @@ type Settings = {
 
 export default function IndexStatus({ onIndexed, onCleared }: Props) {
   const { activeWorkdir, activeWorkdirId, refreshKnownWorkdirs } = useWorkdir();
-  const [path, setPath] = useState("");
+  // Default the knowledge-folder picker to the active workdir so the
+  // common single-folder case is one-click; user can still pick a sub-
+  // folder if they only want to index part of the workdir.
+  const [path, setPath] = useState(activeWorkdir ?? "");
+  useEffect(() => {
+    setPath(activeWorkdir ?? "");
+  }, [activeWorkdir]);
   const [stats, setStats] = useState<Stats>({});
   const [progress, setProgress] = useState<Progress | null>(null);
   const [preprocessProgress, setPreprocessProgress] =

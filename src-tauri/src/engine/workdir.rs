@@ -51,6 +51,13 @@ pub struct WorkdirInfo {
     pub doc_count: Option<i64>,
 }
 
+/// True if `candidate` resolves to a path inside (or equal to) `parent`.
+/// Both inputs must already be canonicalised. Returns false if either path
+/// has no prefix relationship to the other.
+pub fn is_inside(candidate: &Path, parent: &Path) -> bool {
+    candidate == parent || candidate.starts_with(parent)
+}
+
 /// Validate and canonicalise a workdir path, then return the canonical path
 /// and a stable 16-hex-char id. Returns `NotFound` if the path doesn't exist
 /// or isn't a directory; returns `NotCanonical` on permission errors / broken

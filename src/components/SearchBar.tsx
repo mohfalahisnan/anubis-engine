@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Compass, Loader2, Search, Target } from "lucide-react";
 import type { QueryResult } from "./GraphVisualizer";
 import { Button } from "./ui/button";
@@ -55,6 +55,13 @@ export default function SearchBar({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [depth, setDepth] = useState<SearchDepth>(1);
+
+  // Reset state when the user switches to a different workdir so stale
+  // results don't linger from the previous workdir's index.
+  useEffect(() => {
+    setResults([]);
+    setError(null);
+  }, [activeWorkdir]);
 
   async function submit() {
     if (!queryText.trim() || !activeWorkdir) return;

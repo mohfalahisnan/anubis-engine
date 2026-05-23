@@ -115,6 +115,7 @@ fn try_run() -> tauri::Result<()> {
             commands::status_commands::set_transcription_enabled,
             commands::workdir_commands::list_workdirs,
             commands::workdir_commands::delete_workdir,
+            commands::workdir_commands::register_workdir,
         ])
         .run(tauri::generate_context!())
 }
