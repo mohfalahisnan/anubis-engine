@@ -22,12 +22,7 @@ const MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const PROGRESS_TICK_MS: u128 = 200;
 
 /// Skip download when the file is already present locally.
-pub fn ensure_file(
-    path: &Path,
-    url: &str,
-    event_id: &str,
-    label: &str,
-) -> Result<(), String> {
+pub fn ensure_file(path: &Path, url: &str, event_id: &str, label: &str) -> Result<(), String> {
     if path.exists() {
         return Ok(());
     }
@@ -93,8 +88,7 @@ pub fn ensure_file(
     ));
     std::fs::write(&tmp_path, &bytes)
         .map_err(|error| format!("failed to write temp file: {error}"))?;
-    std::fs::rename(&tmp_path, path)
-        .map_err(|error| format!("failed to install file: {error}"))?;
+    std::fs::rename(&tmp_path, path).map_err(|error| format!("failed to install file: {error}"))?;
 
     tracing::info!("downloaded {} ({} bytes)", path.display(), bytes.len());
     events::emit_ready(event_id, label);
@@ -130,7 +124,6 @@ pub fn ensure_file_quiet(path: &Path, url: &str) -> Result<(), String> {
     ));
     std::fs::write(&tmp_path, &bytes)
         .map_err(|error| format!("failed to write temp file: {error}"))?;
-    std::fs::rename(&tmp_path, path)
-        .map_err(|error| format!("failed to install file: {error}"))?;
+    std::fs::rename(&tmp_path, path).map_err(|error| format!("failed to install file: {error}"))?;
     Ok(())
 }

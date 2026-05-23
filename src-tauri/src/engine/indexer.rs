@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
 
 use chrono::Utc;
 use tauri::{AppHandle, Emitter};
@@ -15,11 +17,18 @@ use crate::{
         graph_store::{self},
         vectors,
     },
-    types::{IndexProgress, IndexStatus},
+    types::{IndexProgress, IndexStage, IndexStatus},
     EngineError,
 };
 
-use super::state::AppState;
+use super::{preprocess, state::AppState};
+
+#[derive(Debug, Default)]
+struct IndexRunReport {
+    errors: Vec<String>,
+    cancelled: bool,
+    done: usize,
+}
 
 pub async fn index_folder(
     path: &str,
@@ -30,6 +39,7 @@ pub async fn index_folder(
     if *indexing {
         return Err(EngineError::AlreadyIndexing);
     }
+    state.cancel_token.store(false, Ordering::Relaxed);
     *indexing = true;
     drop(indexing);
 
@@ -41,7 +51,9 @@ pub async fn index_folder(
 }
 
 pub async fn index_file(path: &str, state: &AppState) -> Result<(), EngineError> {
-    index_paths(&[PathBuf::from(path)], state, None).await
+    state.cancel_token.store(false, Ordering::Relaxed);
+    let _ = run_index_paths(&[PathBuf::from(path)], state, None).await?;
+    Ok(())
 }
 
 async fn index_folder_inner(
@@ -50,27 +62,79 @@ async fn index_folder_inner(
     app: Option<AppHandle>,
 ) -> Result<(), EngineError> {
     let paths = collect_supported_files(Path::new(path));
-    emit_progress(&app, paths.len(), 0, "", IndexStatus::Running, Vec::new());
-    index_paths(&paths, state, app.clone()).await?;
+    let preprocess_report = preprocess::run_preprocessing(&paths, state, app.clone()).await?;
+    if preprocess_report.cancelled {
+        emit_progress(
+            &app,
+            paths.len(),
+            0,
+            "",
+            IndexStatus::Cancelled,
+            preprocess_report
+                .failed
+                .iter()
+                .map(|(path, error)| format!("{}: {}", path.display(), error))
+                .collect(),
+            None,
+        );
+        return Ok(());
+    }
+
+    let failed_preprocess: HashSet<PathBuf> = preprocess_report
+        .failed
+        .iter()
+        .map(|(path, _)| path.clone())
+        .collect();
+    let indexable_paths: Vec<PathBuf> = paths
+        .into_iter()
+        .filter(|path| !failed_preprocess.contains(path))
+        .collect();
+
+    let report = run_index_paths(&indexable_paths, state, app.clone()).await?;
+    let status = if report.cancelled {
+        IndexStatus::Cancelled
+    } else if report.errors.is_empty() {
+        IndexStatus::Done
+    } else {
+        IndexStatus::Error
+    };
     emit_progress(
         &app,
-        paths.len(),
-        paths.len(),
+        indexable_paths.len(),
+        report.done,
         "",
-        IndexStatus::Done,
-        Vec::new(),
+        status,
+        report.errors,
+        None,
     );
     Ok(())
 }
 
-async fn index_paths(
+async fn run_index_paths(
     paths: &[PathBuf],
     state: &AppState,
     app: Option<AppHandle>,
-) -> Result<(), EngineError> {
+) -> Result<IndexRunReport, EngineError> {
     let mut errors = Vec::new();
 
     for (index, path) in paths.iter().enumerate() {
+        if state.cancel_token.load(Ordering::Relaxed) {
+            emit_progress(
+                &app,
+                paths.len(),
+                index,
+                "",
+                IndexStatus::Cancelled,
+                errors.clone(),
+                None,
+            );
+            return Ok(IndexRunReport {
+                errors,
+                cancelled: true,
+                done: index,
+            });
+        }
+
         let current = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -83,35 +147,114 @@ async fn index_paths(
             &current,
             IndexStatus::Running,
             errors.clone(),
+            None,
         );
 
-        if let Err(error) = index_one(path, state).await {
-            tracing::error!("failed to index {}: {}", path.display(), error);
-            errors.push(format!("{}: {}", path.display(), error));
+        match index_one(path, state, &app, paths.len(), index, &current, &errors).await {
+            Ok(true) => {}
+            Ok(false) => {
+                return Ok(IndexRunReport {
+                    errors,
+                    cancelled: true,
+                    done: index,
+                });
+            }
+            Err(error) => {
+                tracing::error!("failed to index {}: {}", path.display(), error);
+                errors.push(format!("{}: {}", path.display(), error));
+            }
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        emit_progress(
-            &app,
-            paths.len(),
-            paths.len(),
-            "",
-            IndexStatus::Error,
-            errors,
-        );
-        Ok(())
-    }
+    Ok(IndexRunReport {
+        errors,
+        cancelled: false,
+        done: paths.len(),
+    })
 }
 
-async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
-    let mut parsed = parser::parse(path)?;
-    let existing = {
+async fn index_one(
+    path: &Path,
+    state: &AppState,
+    app: &Option<AppHandle>,
+    total: usize,
+    done: usize,
+    current: &str,
+    errors: &[String],
+) -> Result<bool, EngineError> {
+    if check_cancelled(state, app, total, done, current, errors) {
+        return Ok(false);
+    }
+    emit_progress(
+        app,
+        total,
+        done,
+        current,
+        IndexStatus::Running,
+        errors.to_vec(),
+        Some(IndexStage::Parsing),
+    );
+
+    // Pre-flight: read just the file metadata so even if parsing fails (e.g.
+    // a long transcription that errors halfway), the user still sees the
+    // document in the index with status='error' instead of having it silently
+    // disappear from the list.
+    let preflight_meta = parser::metadata_for_path(path)?;
+    let preflight_path = path.to_string_lossy().into_owned();
+    let preflight_format = parser::format_from_path(path);
+    let preflight_class = parser::doc_class_from_path(path);
+
+    let existing_for_id = {
         let db = state.db.lock().await;
-        db::get_document_by_path(&db, &parsed.path)?
+        db::get_document_by_path(&db, &preflight_path)?
     };
+
+    let mut parsed = match parser::parse(path) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            // Record the failure so the UI can show it and the user can re-try
+            // by re-indexing. Without this branch the file would never show up
+            // in the documents list.
+            let error_doc = db::DocumentRecord {
+                id: existing_for_id
+                    .as_ref()
+                    .map(|d| d.id.clone())
+                    .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+                path: preflight_path.clone(),
+                filename: preflight_meta.filename.clone(),
+                format: preflight_format,
+                size_bytes: preflight_meta.size_bytes,
+                hash: preflight_meta.hash.clone(),
+                indexed_at: Utc::now().to_rfc3339(),
+                status: "error".to_string(),
+                error_msg: Some(error.to_string()),
+                doc_class: preflight_class,
+            };
+            let db = state.db.lock().await;
+            db::upsert_document(&db, &error_doc)?;
+            tracing::error!(
+                "parse failed for {}: {} (recorded as error doc)",
+                preflight_path,
+                error
+            );
+            return Err(error);
+        }
+    };
+
+    if check_cancelled(state, app, total, done, current, errors) {
+        return Ok(false);
+    }
+    emit_progress(
+        app,
+        total,
+        done,
+        current,
+        IndexStatus::Running,
+        errors.to_vec(),
+        Some(IndexStage::Embedding),
+    );
+
+    let existing = existing_for_id;
     if let Some(existing_doc) = &existing {
         parsed.doc_id = existing_doc.id.clone();
     }
@@ -122,7 +265,7 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         .unwrap_or(false)
     {
         tracing::info!("skipping unchanged file {}", parsed.path);
-        return Ok(());
+        return Ok(true);
     }
 
     let doc = db::DocumentRecord {
@@ -135,6 +278,7 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         indexed_at: Utc::now().to_rfc3339(),
         status: "pending".to_string(),
         error_msg: None,
+        doc_class: parsed.doc_class,
     };
 
     let chunks_for_doc = sliding::chunk_document(&parsed);
@@ -185,6 +329,19 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
     }
     let entity_hits = entities::extract_from_chunks(&chunks_for_doc);
 
+    if check_cancelled(state, app, total, done, current, errors) {
+        return Ok(false);
+    }
+    emit_progress(
+        app,
+        total,
+        done,
+        current,
+        IndexStatus::Running,
+        errors.to_vec(),
+        Some(IndexStage::Writing),
+    );
+
     // Snapshot existing vectors from other docs (for cross-doc edges) BEFORE
     // we write the new doc's chunks/vectors. Done under one db lock.
     let mut all_edges = Vec::new();
@@ -195,21 +352,40 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
 
         db::upsert_document(&db, &doc)?;
         chunks::replace_doc_chunks(&mut db, &parsed.doc_id, &chunks_for_doc)?;
-        for (chunk, embedding) in chunks_for_doc.iter().zip(embeddings.iter()) {
-            vectors::upsert_vector(&db, &chunk.id, embedding)?;
-        }
+
+        let vector_items: Vec<(&str, &[f32])> = chunks_for_doc
+            .iter()
+            .zip(embeddings.iter())
+            .map(|(chunk, embedding)| (chunk.id.as_str(), embedding.as_slice()))
+            .collect();
+        vectors::upsert_vectors_batch(&mut db, &vector_items)?;
 
         // Persist entities; then derive shared_entity edges from the DB.
-        entity_store::insert_entities(&db, &entity_hits)?;
+        entity_store::insert_entities(&mut db, &entity_hits)?;
 
         let semantic_edges = builder::build_edges(&chunks_for_doc, &embeddings, &existing_vectors);
-        let shared_edges = entity_store::build_shared_entity_edges(&db, &parsed.doc_id)?;
+        let shared_anchor_edges = entity_store::build_shared_anchor_edges(&db, &parsed.doc_id)?;
+        let shared_entity_edges = entity_store::build_shared_entity_edges(&db, &parsed.doc_id)?;
+        let manifest_overlap_edges =
+            entity_store::build_manifest_overlap_edges(&db, &parsed.doc_id)?;
 
         all_edges.extend(semantic_edges);
-        all_edges.extend(shared_edges);
+        all_edges.extend(shared_anchor_edges);
+        all_edges.extend(shared_entity_edges);
+        all_edges.extend(manifest_overlap_edges);
 
         graph_store::upsert_edges(&mut db, &all_edges)?;
     }
+
+    emit_progress(
+        app,
+        total,
+        done,
+        current,
+        IndexStatus::Running,
+        errors.to_vec(),
+        Some(IndexStage::Linking),
+    );
 
     {
         let fts = state.fts.lock().await;
@@ -231,7 +407,31 @@ async fn index_one(path: &Path, state: &AppState) -> Result<(), EngineError> {
         all_edges.len(),
         entity_hits.len(),
     );
-    Ok(())
+    Ok(true)
+}
+
+fn check_cancelled(
+    state: &AppState,
+    app: &Option<AppHandle>,
+    total: usize,
+    done: usize,
+    current: &str,
+    errors: &[String],
+) -> bool {
+    if state.cancel_token.load(Ordering::Relaxed) {
+        emit_progress(
+            app,
+            total,
+            done,
+            current,
+            IndexStatus::Cancelled,
+            errors.to_vec(),
+            None,
+        );
+        true
+    } else {
+        false
+    }
 }
 
 async fn mark_document_embedding_error(
@@ -261,8 +461,19 @@ fn collect_supported_files(root: &Path) -> Vec<PathBuf> {
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
         .map(|entry| entry.into_path())
-        .filter(|path| is_supported(path))
+        .filter(|path| is_supported(path) && !is_engine_output(path))
         .collect()
+}
+
+/// Skip files we wrote ourselves (transcript sidecars + extracted audio).
+/// We mark them with a `.anubis.` infix so we can recognise them next time
+/// the user re-indexes the folder — otherwise the extracted WAV would be
+/// re-fed to ffmpeg in a loop ("Output same as Input #0").
+fn is_engine_output(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|name| name.to_ascii_lowercase().contains(".anubis."))
+        .unwrap_or(false)
 }
 
 fn is_supported(path: &Path) -> bool {
@@ -276,6 +487,8 @@ fn is_supported(path: &Path) -> bool {
                 | "pdf"
                 | "docx"
                 | "xlsx"
+                | "csv"
+                | "json"
                 | "png"
                 | "jpg"
                 | "jpeg"
@@ -304,6 +517,7 @@ fn emit_progress(
     current: &str,
     status: IndexStatus,
     errors: Vec<String>,
+    stage: Option<IndexStage>,
 ) {
     if let Some(app) = app {
         if let Err(error) = app.emit(
@@ -314,6 +528,7 @@ fn emit_progress(
                 current: current.to_string(),
                 status,
                 errors,
+                stage,
             },
         ) {
             tracing::warn!("failed to emit index progress: {}", error);

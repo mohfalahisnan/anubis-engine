@@ -4,9 +4,12 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{types::DocFormat, EngineError};
+use crate::{
+    types::{DocClass, DocFormat},
+    EngineError,
+};
 
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DocumentRecord {
@@ -19,6 +22,7 @@ pub struct DocumentRecord {
     pub indexed_at: String,
     pub status: String,
     pub error_msg: Option<String>,
+    pub doc_class: DocClass,
 }
 
 pub fn open(path: &Path) -> Result<Connection, EngineError> {
@@ -57,6 +61,7 @@ pub fn migrate(conn: &Connection) -> Result<(), EngineError> {
             char_start  INTEGER NOT NULL,
             char_end    INTEGER NOT NULL,
             page        INTEGER,
+            chunk_signal TEXT NOT NULL DEFAULT 'content',
             created_at  TEXT NOT NULL
         );
 
@@ -109,7 +114,38 @@ pub fn migrate(conn: &Connection) -> Result<(), EngineError> {
         "#,
     )?;
     migrate_entity_search_schema(conn)?;
+    migrate_relations_rework_schema(conn)?;
+    migrate_chunk_signal_schema(conn)?;
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    Ok(())
+}
+
+fn migrate_chunk_signal_schema(conn: &Connection) -> Result<(), EngineError> {
+    if !column_exists(conn, "chunks", "chunk_signal")? {
+        conn.execute(
+            "ALTER TABLE chunks ADD COLUMN chunk_signal TEXT NOT NULL DEFAULT 'content'",
+            [],
+        )?;
+    }
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_chunks_signal ON chunks(chunk_signal);")?;
+    Ok(())
+}
+
+/// Adds doc_class to documents and reason to graph_edges. Idempotent — guarded
+/// by `column_exists` so re-running on an already-migrated DB is a no-op.
+/// Pre-migration rows take the column defaults (`content` and NULL); read
+/// paths tolerate NULL reason and surface only `edge_type` for legacy edges.
+fn migrate_relations_rework_schema(conn: &Connection) -> Result<(), EngineError> {
+    if !column_exists(conn, "documents", "doc_class")? {
+        conn.execute(
+            "ALTER TABLE documents ADD COLUMN doc_class TEXT NOT NULL DEFAULT 'content'",
+            [],
+        )?;
+    }
+    if !column_exists(conn, "graph_edges", "reason")? {
+        conn.execute("ALTER TABLE graph_edges ADD COLUMN reason TEXT", [])?;
+    }
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_docs_doc_class ON documents(doc_class);")?;
     Ok(())
 }
 
@@ -187,9 +223,9 @@ pub fn upsert_document(conn: &Connection, doc: &DocumentRecord) -> Result<(), En
     conn.execute(
         r#"
         INSERT INTO documents (
-            id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg
+            id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg, doc_class
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         ON CONFLICT(path) DO UPDATE SET
             id = excluded.id,
             filename = excluded.filename,
@@ -198,7 +234,8 @@ pub fn upsert_document(conn: &Connection, doc: &DocumentRecord) -> Result<(), En
             hash = excluded.hash,
             indexed_at = excluded.indexed_at,
             status = excluded.status,
-            error_msg = excluded.error_msg
+            error_msg = excluded.error_msg,
+            doc_class = excluded.doc_class
         "#,
         params![
             doc.id,
@@ -209,7 +246,8 @@ pub fn upsert_document(conn: &Connection, doc: &DocumentRecord) -> Result<(), En
             doc.hash,
             doc.indexed_at,
             doc.status,
-            doc.error_msg
+            doc.error_msg,
+            doc.doc_class.as_str(),
         ],
     )?;
     Ok(())
@@ -221,7 +259,7 @@ pub fn get_document_by_path(
 ) -> Result<Option<DocumentRecord>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg
+        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg, doc_class
         FROM documents
         WHERE path = ?1
         "#,
@@ -240,7 +278,7 @@ pub fn get_document_by_id(
 ) -> Result<Option<DocumentRecord>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg
+        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg, doc_class
         FROM documents
         WHERE id = ?1
         "#,
@@ -256,7 +294,7 @@ pub fn get_document_by_id(
 pub fn list_documents(conn: &Connection) -> Result<Vec<serde_json::Value>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg
+        SELECT id, path, filename, format, size_bytes, hash, indexed_at, status, error_msg, doc_class
         FROM documents
         ORDER BY indexed_at DESC, filename ASC
         "#,
@@ -273,6 +311,7 @@ pub fn list_documents(conn: &Connection) -> Result<Vec<serde_json::Value>, Engin
             "indexed_at": doc.indexed_at,
             "status": doc.status,
             "error_msg": doc.error_msg,
+            "doc_class": doc.doc_class.as_str(),
         }))
     })?;
 
@@ -347,6 +386,7 @@ pub fn get_index_stats(conn: &Connection) -> Result<serde_json::Value, EngineErr
 fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentRecord> {
     let format: String = row.get(3)?;
     let size_bytes: i64 = row.get(4)?;
+    let doc_class: String = row.get(9)?;
     Ok(DocumentRecord {
         id: row.get(0)?,
         path: row.get(1)?,
@@ -357,6 +397,7 @@ fn row_to_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<DocumentRecord> 
         indexed_at: row.get(6)?,
         status: row.get(7)?,
         error_msg: row.get(8)?,
+        doc_class: DocClass::from_db(&doc_class),
     })
 }
 
@@ -366,7 +407,7 @@ mod tests {
         delete_document, get_document_by_path, get_index_stats, migrate, upsert_document,
         DocumentRecord,
     };
-    use crate::types::DocFormat;
+    use crate::types::{DocClass, DocFormat};
 
     #[test]
     fn migrate_creates_schema_and_sets_user_version() {
@@ -392,7 +433,7 @@ mod tests {
             )
             .expect("index count");
 
-        assert_eq!(version, 2);
+        assert_eq!(version, 4);
         assert_eq!(documents_exists, 1);
         assert_eq!(chunks_doc_index_exists, 1);
         let normalized_column_exists: i64 = conn
@@ -428,6 +469,7 @@ mod tests {
             indexed_at: "2026-05-21T00:00:00Z".to_string(),
             status: "indexed".to_string(),
             error_msg: None,
+            doc_class: DocClass::Content,
         };
 
         upsert_document(&conn, &doc).expect("insert document");

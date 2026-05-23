@@ -5,8 +5,11 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  CircleStop,
   FolderOpen,
   Loader2,
+  Mic2,
+  MicOff,
   Play,
   RefreshCw,
   Trash2,
@@ -14,6 +17,7 @@ import {
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { Badge } from "./ui/badge";
+import { cn } from "../lib/utils";
 
 type Stats = {
   documents?: number;
@@ -28,8 +32,19 @@ type Progress = {
   total: number;
   done: number;
   current: string;
-  status: "idle" | "running" | "done" | "error";
+  status: "idle" | "running" | "done" | "error" | "cancelled";
   errors: string[];
+  stage?: "parsing" | "embedding" | "writing" | "linking";
+};
+
+type PreprocessProgress = {
+  total: number;
+  done: number;
+  current: string;
+  status: "idle" | "running" | "done" | "error" | "cancelled";
+  errors: string[];
+  kind?: "video" | "audio" | "image" | "pdf";
+  stage?: "transcribing" | "ocr" | "cachedskipped" | "cached_skipped";
 };
 
 type Props = {
@@ -37,13 +52,21 @@ type Props = {
   onCleared: () => void;
 };
 
+type Settings = {
+  transcription_enabled: boolean;
+};
+
 export default function IndexStatus({ onIndexed, onCleared }: Props) {
   const [path, setPath] = useState("");
   const [stats, setStats] = useState<Stats>({});
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [preprocessProgress, setPreprocessProgress] =
+    useState<PreprocessProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transcribeEnabled, setTranscribeEnabled] = useState(true);
+  const [savingTranscribe, setSavingTranscribe] = useState(false);
 
   async function loadStats() {
     try {
@@ -71,6 +94,7 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
           const ready = await invoke<boolean>("engine_ready");
           if (ready) {
             await loadStats();
+            await loadSettings();
             return;
           }
         } catch {
@@ -85,9 +109,36 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     };
   }, []);
 
+  async function loadSettings() {
+    try {
+      const next = await invoke<Settings>("get_settings");
+      setTranscribeEnabled(!!next.transcription_enabled);
+    } catch {
+      // Optional — surface no error if the backend is older than this command.
+    }
+  }
+
+  async function toggleTranscribe() {
+    if (savingTranscribe) return;
+    const next = !transcribeEnabled;
+    setTranscribeEnabled(next); // optimistic — feels snappier
+    setSavingTranscribe(true);
+    try {
+      await invoke("set_transcription_enabled", { enabled: next });
+    } catch (reason) {
+      setTranscribeEnabled(!next); // rollback
+      setError(String(reason));
+    } finally {
+      setSavingTranscribe(false);
+    }
+  }
+
   useEffect(() => {
     const unlisten = listen<Progress>("index-progress", (event) => {
       setProgress(event.payload);
+      if (event.payload.status === "running") {
+        setPreprocessProgress(null);
+      }
       if (event.payload.status === "done") {
         setBusy(false);
         loadStats().then(onIndexed);
@@ -95,6 +146,23 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
       if (event.payload.status === "error") {
         setBusy(false);
         setError(event.payload.errors.join("\n") || "Indexing failed");
+      }
+      if (event.payload.status === "cancelled") {
+        setBusy(false);
+        loadStats().then(onIndexed);
+      }
+    });
+    return () => {
+      unlisten.then((dispose) => dispose()).catch(() => undefined);
+    };
+  }, [onIndexed]);
+
+  useEffect(() => {
+    const unlisten = listen<PreprocessProgress>("preprocess-progress", (event) => {
+      setPreprocessProgress(event.payload);
+      if (event.payload.status === "cancelled") {
+        setBusy(false);
+        loadStats().then(onIndexed);
       }
     });
     return () => {
@@ -121,13 +189,24 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
     if (!path.trim()) return;
     setBusy(true);
     setError(null);
-    setProgress({ total: 0, done: 0, current: "", status: "running", errors: [] });
+    setPreprocessProgress(null);
+    setProgress(null);
     try {
       await invoke("index_folder", { path: path.trim() });
+      setBusy(false);
       await loadStats();
       onIndexed();
     } catch (reason) {
       setBusy(false);
+      setError(String(reason));
+    }
+  }
+
+  async function cancelIndexing() {
+    if (!busy) return;
+    try {
+      await invoke("cancel_indexing");
+    } catch (reason) {
       setError(String(reason));
     }
   }
@@ -155,6 +234,9 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
   const hasIndex = (stats.documents ?? 0) > 0;
   const pct = progress && progress.total > 0
     ? Math.round((progress.done / progress.total) * 100)
+    : 0;
+  const preprocessPct = preprocessProgress && preprocessProgress.total > 0
+    ? Math.round((preprocessProgress.done / preprocessProgress.total) * 100)
     : 0;
 
   return (
@@ -221,6 +303,49 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
           </button>
         </div>
 
+        <button
+          type="button"
+          onClick={toggleTranscribe}
+          disabled={savingTranscribe}
+          className="flex w-full items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--color-accent)] disabled:opacity-60"
+          title={
+            transcribeEnabled
+              ? "Click to skip Whisper transcription for video & audio files"
+              : "Click to enable Whisper transcription for video & audio files"
+          }
+        >
+          {transcribeEnabled ? (
+            <Mic2 className="size-4 shrink-0 text-[var(--color-primary)]" />
+          ) : (
+            <MicOff className="size-4 shrink-0 text-[var(--color-muted-foreground)]" />
+          )}
+          <div className="flex-1">
+            <div className="font-medium">
+              Transcribe video &amp; audio
+            </div>
+            <div className="text-[10px] text-[var(--color-muted-foreground)]">
+              {transcribeEnabled
+                ? "On — runs Whisper on indexed media"
+                : "Off — media files indexed as metadata only"}
+            </div>
+          </div>
+          <span
+            className={cn(
+              "flex h-5 w-9 items-center rounded-full border transition-colors",
+              transcribeEnabled
+                ? "border-[var(--color-primary)]/40 bg-[var(--color-primary)]/30"
+                : "border-[var(--color-border)] bg-[var(--color-muted)]/60",
+            )}
+          >
+            <span
+              className={cn(
+                "h-4 w-4 rounded-full bg-[var(--color-card)] shadow-sm transition-transform",
+                transcribeEnabled ? "translate-x-4" : "translate-x-0.5",
+              )}
+            />
+          </span>
+        </button>
+
         <div className="flex gap-2">
           <Button
             onClick={indexFolder}
@@ -257,33 +382,35 @@ export default function IndexStatus({ onIndexed, onCleared }: Props) {
             )}
             Clear
           </Button>
+          <Button
+            onClick={cancelIndexing}
+            disabled={!busy}
+            variant="outline"
+            size="sm"
+            title="Stop indexing after the current step"
+          >
+            <CircleStop className="size-4" />
+            Cancel
+          </Button>
         </div>
       </div>
 
+      {preprocessProgress && preprocessProgress.status !== "idle" ? (
+        <ProgressPanel
+          label="Preprocessing"
+          progress={preprocessProgress}
+          value={preprocessPct}
+          detail={preprocessDetail(preprocessProgress)}
+        />
+      ) : null}
+
       {progress && progress.status !== "idle" ? (
-        <div className="space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-3">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              {progress.status === "running" ? (
-                <Loader2 className="size-3.5 animate-spin text-[var(--color-primary)]" />
-              ) : progress.status === "done" ? (
-                <CheckCircle2 className="size-3.5 text-[var(--color-success)]" />
-              ) : (
-                <AlertTriangle className="size-3.5 text-[var(--color-destructive)]" />
-              )}
-              <span className="font-medium capitalize">{progress.status}</span>
-            </div>
-            <span className="font-mono text-[var(--color-muted-foreground)]">
-              {progress.done}/{progress.total}
-            </span>
-          </div>
-          <Progress value={pct} />
-          {progress.current ? (
-            <p className="truncate text-[11px] text-[var(--color-muted-foreground)]">
-              {progress.current}
-            </p>
-          ) : null}
-        </div>
+        <ProgressPanel
+          label="Indexing"
+          progress={progress}
+          value={pct}
+          detail={indexDetail(progress)}
+        />
       ) : null}
 
       {error ? (
@@ -307,6 +434,73 @@ function Stat({ label, value }: { label: string; value: number }) {
       </div>
     </div>
   );
+}
+
+function ProgressPanel({
+  label,
+  progress,
+  value,
+  detail,
+}: {
+  label: string;
+  progress: Pick<Progress, "total" | "done" | "current" | "status">;
+  value: number;
+  detail?: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-3">
+      <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2">
+          {progress.status === "running" ? (
+            <Loader2 className="size-3.5 animate-spin text-[var(--color-primary)]" />
+          ) : progress.status === "done" ? (
+            <CheckCircle2 className="size-3.5 text-[var(--color-success)]" />
+          ) : (
+            <AlertTriangle className="size-3.5 text-[var(--color-destructive)]" />
+          )}
+          <span className="font-medium">{label}</span>
+          <span className="text-[var(--color-muted-foreground)]">
+            {statusLabel(progress.status)}
+          </span>
+        </div>
+        <span className="font-mono text-[var(--color-muted-foreground)]">
+          {progress.done}/{progress.total}
+        </span>
+      </div>
+      <Progress value={value} />
+      {detail || progress.current ? (
+        <p className="truncate text-[11px] text-[var(--color-muted-foreground)]">
+          {[detail, progress.current].filter(Boolean).join(" - ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function statusLabel(status: Progress["status"]) {
+  if (status === "done") return "done";
+  if (status === "cancelled") return "cancelled";
+  if (status === "error") return "failed";
+  return "running";
+}
+
+function indexDetail(progress: Progress) {
+  const labels: Record<NonNullable<Progress["stage"]>, string> = {
+    parsing: "parsing",
+    embedding: "embedding",
+    writing: "writing",
+    linking: "linking",
+  };
+  return progress.stage ? labels[progress.stage] : undefined;
+}
+
+function preprocessDetail(progress: PreprocessProgress) {
+  if (progress.stage === "cachedskipped" || progress.stage === "cached_skipped") {
+    return "cached";
+  }
+  if (progress.stage === "transcribing") return "transcribing";
+  if (progress.stage === "ocr") return "reading image text";
+  return progress.kind;
 }
 
 export function StatusBadge({ status }: { status: string }) {

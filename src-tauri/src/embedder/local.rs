@@ -9,10 +9,7 @@ pub const EMBEDDING_DIM: usize = 384;
 const PASSAGE_PREFIX: &str = "passage: ";
 const QUERY_PREFIX: &str = "query: ";
 
-fn embed_raw(
-    model: &mut TextEmbedding,
-    texts: &[String],
-) -> Result<Vec<Vec<f32>>, EngineError> {
+fn embed_raw(model: &mut TextEmbedding, texts: &[String]) -> Result<Vec<Vec<f32>>, EngineError> {
     model
         .embed(texts, None)
         .map_err(|error| EngineError::Embed(error.to_string()))

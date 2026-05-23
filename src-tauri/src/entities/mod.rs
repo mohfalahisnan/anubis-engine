@@ -1,14 +1,22 @@
 //! Lightweight, dependency-free entity extraction.
 //!
-//! Pulls three kinds of signals out of chunk text:
+//! Pulls four kinds of signals out of chunk text:
+//! - `ANCHOR`: structured all-caps IDs like `VID-APPROVAL-005`,
+//!   `INC-2026-ATLAS-014`, `APPROVAL-Q-ATLAS`. These are the only entity
+//!   type that produces high-confidence cross-doc relations (weight 0.9).
 //! - `DATE`: numeric date patterns (DD/MM/YY[YY], DD-MM-YY[YY])
 //! - `PROPER`: capitalized tokens that aren't sentence-starting common words
-//! - `KEYWORD`: top-N most-frequent content tokens (rough TF)
+//! - `PHRASE`: capitalized or content bigrams
+//! - `KEYWORD`: top-N most-frequent content tokens (rough TF) — never
+//!   produces edges; kept for query-time exact match only.
 //!
 //! No NER model. Cheap, deterministic, good enough to seed `shared_entity`
 //! edges across documents.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
+
+use regex::Regex;
 
 use crate::types::Chunk;
 
@@ -27,12 +35,60 @@ const MAX_TOKEN_LEN: usize = 30;
 pub fn extract_from_chunks(chunks: &[Chunk]) -> Vec<EntityHit> {
     let mut hits = Vec::new();
     for chunk in chunks {
+        hits.extend(extract_anchors(&chunk.id, &chunk.content));
         hits.extend(extract_dates(&chunk.id, &chunk.content));
         hits.extend(extract_phrases(&chunk.id, &chunk.content));
         hits.extend(extract_proper_nouns(&chunk.id, &chunk.content));
         hits.extend(extract_keywords(&chunk.id, &chunk.content));
     }
     hits
+}
+
+/// Structural ID anchors: at least three ALL-CAPS-or-digit segments joined
+/// by hyphens, total length ≤ 64. The first segment must start with a letter
+/// (so we don't catch `2026-05-21` here — that's the DATE detector's job).
+///
+/// Accepts: `VID-APPROVAL-005`, `INC-2026-ATLAS-014`, `APPROVAL-Q-ATLAS`,
+/// `SHIP-NODE-SURYA`.
+/// Rejects: `Anubis` (single token), `INC-014` (only 2 segments),
+/// `Q1-2026` (first segment too short / shape doesn't match).
+///
+/// Capped at `MAX_ANCHORS_PER_CHUNK` unique anchors per chunk: a manifest
+/// row listing hundreds of IDs in one line shouldn't produce hundreds of
+/// entity-table writes and a quadratic explosion in the cross-doc edge
+/// builder. Twenty is well above the realistic density of anchors per
+/// chunk of prose; a single chunk that needs more is almost certainly a
+/// listing/index file (`doc_class='reference'`).
+const MAX_ANCHORS_PER_CHUNK: usize = 20;
+
+fn extract_anchors(chunk_id: &str, text: &str) -> Vec<EntityHit> {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        // \b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+){2,}\b
+        Regex::new(r"\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+){2,}\b").expect("anchor regex compiles")
+    });
+
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for m in re.find_iter(text) {
+        let value = m.as_str();
+        if value.len() > 64 {
+            continue;
+        }
+        if !seen.insert(value.to_string()) {
+            continue;
+        }
+        out.push(EntityHit {
+            chunk_id: chunk_id.to_string(),
+            entity_type: "ANCHOR".to_string(),
+            value: value.to_string(),
+            confidence: 1.0,
+        });
+        if out.len() >= MAX_ANCHORS_PER_CHUNK {
+            break;
+        }
+    }
+    out
 }
 
 fn extract_dates(chunk_id: &str, text: &str) -> Vec<EntityHit> {
@@ -242,6 +298,7 @@ mod tests {
             char_start: 0,
             char_end: content.len(),
             page: None,
+            signal: crate::types::ChunkSignal::Content,
         }
     }
 
@@ -285,6 +342,67 @@ mod tests {
             .collect();
         assert!(proper.contains(&"Anubis"));
         assert!(proper.contains(&"Indonesia"));
+    }
+
+    #[test]
+    fn extracts_known_anchor_id_shapes() {
+        let hits = extract_from_chunks(&[chunk(
+            "c1",
+            "Linked tickets: VID-APPROVAL-005 and INC-2026-ATLAS-014 plus APPROVAL-Q-ATLAS \
+             and the SHIP-NODE-SURYA route.",
+        )]);
+        let anchors: Vec<&str> = hits
+            .iter()
+            .filter(|h| h.entity_type == "ANCHOR")
+            .map(|h| h.value.as_str())
+            .collect();
+        for want in [
+            "VID-APPROVAL-005",
+            "INC-2026-ATLAS-014",
+            "APPROVAL-Q-ATLAS",
+            "SHIP-NODE-SURYA",
+        ] {
+            assert!(
+                anchors.contains(&want),
+                "expected anchor {want} in {anchors:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn caps_anchors_per_chunk_to_defend_against_listing_files() {
+        // 50 unique anchors in one line — must cap at 20 so a manifest row
+        // listing every ticket in the project can't blow up the entity
+        // table.
+        let mut text = String::with_capacity(50 * 20);
+        for i in 0..50 {
+            text.push_str(&format!("INC-2026-ATLAS-{i:03} "));
+        }
+        let hits = extract_from_chunks(&[chunk("c1", &text)]);
+        let anchors: Vec<_> = hits.iter().filter(|h| h.entity_type == "ANCHOR").collect();
+        assert!(
+            anchors.len() <= super::MAX_ANCHORS_PER_CHUNK,
+            "expected ≤ {} anchors, got {}",
+            super::MAX_ANCHORS_PER_CHUNK,
+            anchors.len()
+        );
+    }
+
+    #[test]
+    fn rejects_non_anchor_shapes() {
+        // `Anubis` is mixed case (single token), `INC-014` only has 2 segments,
+        // `Q1-2026` doesn't satisfy the leading letter+letter/digit shape with
+        // 3 segments, lowercase IDs must not match.
+        let hits = extract_from_chunks(&[chunk(
+            "c1",
+            "Anubis briefing for INC-014 on Q1-2026 see also vid-approval-005.",
+        )]);
+        let anchors: Vec<&str> = hits
+            .iter()
+            .filter(|h| h.entity_type == "ANCHOR")
+            .map(|h| h.value.as_str())
+            .collect();
+        assert!(anchors.is_empty(), "no false-positive anchors: {anchors:?}");
     }
 
     #[test]

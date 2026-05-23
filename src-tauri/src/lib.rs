@@ -29,6 +29,11 @@ pub enum EngineError {
     Ocr(String),
     #[error("Transcription error: {0}")]
     Transcribe(String),
+    /// Soft signal — file has no audio stream so there's nothing to
+    /// transcribe. Callers can treat this as "indexed with empty text"
+    /// rather than a hard failure.
+    #[error("No audio track in {0}")]
+    NoAudioTrack(String),
     #[error("Index already running")]
     AlreadyIndexing,
     #[error("IO error: {0}")]
@@ -88,6 +93,7 @@ fn try_run() -> tauri::Result<()> {
         .invoke_handler(tauri::generate_handler![
             commands::index_commands::index_folder,
             commands::index_commands::index_file,
+            commands::index_commands::cancel_indexing,
             commands::index_commands::remove_document,
             commands::index_commands::reset_index,
             commands::query_commands::query,
@@ -99,6 +105,8 @@ fn try_run() -> tauri::Result<()> {
             commands::status_commands::get_index_stats,
             commands::status_commands::list_documents,
             commands::status_commands::engine_ready,
+            commands::status_commands::get_settings,
+            commands::status_commands::set_transcription_enabled,
         ])
         .run(tauri::generate_context!())
 }

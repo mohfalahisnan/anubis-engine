@@ -73,6 +73,7 @@ pub fn parse_markdown_str(
         format,
         pages,
         metadata,
+        doc_class: Default::default(),
     }
 }
 
@@ -128,10 +129,7 @@ fn split_sections(markdown: &str) -> Vec<Section> {
                 heading_stack.push((level, heading_text));
 
                 if (level as u8) <= (SECTION_HEADING_MAX_LEVEL as u8) {
-                    current_path = heading_stack
-                        .iter()
-                        .map(|(_, text)| text.clone())
-                        .collect();
+                    current_path = heading_stack.iter().map(|(_, text)| text.clone()).collect();
                 } else {
                     // Deeper heading: keep as inline body so the section
                     // doesn't fragment.
@@ -147,9 +145,7 @@ fn split_sections(markdown: &str) -> Vec<Section> {
                 if in_heading.is_some() {
                     heading_buf.push_str(&value);
                 } else {
-                    if !current_body.is_empty()
-                        && !current_body.ends_with(char::is_whitespace)
-                    {
+                    if !current_body.is_empty() && !current_body.ends_with(char::is_whitespace) {
                         current_body.push(' ');
                     }
                     current_body.push_str(&value);

@@ -45,6 +45,7 @@ pub fn parse(path: &Path) -> Result<ParsedDoc, EngineError> {
             images: Vec::new(),
         }],
         metadata,
+        doc_class: Default::default(),
     })
 }
 

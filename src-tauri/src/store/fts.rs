@@ -182,7 +182,7 @@ mod tests {
         clear, create_in_ram, delete_chunks, rebuild_from_indexed_chunks, replace_chunks, search,
     };
     use crate::store::db::migrate;
-    use crate::types::Chunk;
+    use crate::types::{Chunk, ChunkSignal};
 
     #[test]
     fn indexes_and_searches_chunks_with_bm25() {
@@ -195,6 +195,7 @@ mod tests {
             char_start: 0,
             char_end: 21,
             page: None,
+            signal: ChunkSignal::Content,
         }];
 
         replace_chunks(&index, &chunks).expect("index chunks");
@@ -215,6 +216,7 @@ mod tests {
             char_start: 0,
             char_end: 17,
             page: None,
+            signal: ChunkSignal::Content,
         }];
         let new_chunks = vec![Chunk {
             id: "chunk-new".to_string(),
@@ -224,6 +226,7 @@ mod tests {
             char_start: 0,
             char_end: 17,
             page: None,
+            signal: ChunkSignal::Content,
         }];
 
         replace_chunks(&index, &old_chunks).expect("index old chunks");
@@ -248,6 +251,7 @@ mod tests {
             char_start: 0,
             char_end: 21,
             page: None,
+            signal: ChunkSignal::Content,
         }];
 
         replace_chunks(&index, &chunks).expect("index chunks");
@@ -287,6 +291,7 @@ mod tests {
                 char_start: 0,
                 char_end: 20,
                 page: None,
+                signal: ChunkSignal::Content,
             }],
         )
         .expect("seed stale fts");

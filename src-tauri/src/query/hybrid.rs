@@ -38,6 +38,9 @@ pub const W_CENTRALITY_TIEBREAK: f32 = 0.05;
 /// contribute anything. Stops "hub" chunks (READMEs, glossaries, intros) from
 /// dominating queries they don't actually answer.
 pub const CENTRALITY_RELEVANCE_GATE: f32 = 0.20;
+pub const STRONG_EDGE_THRESHOLD: f32 = 0.62;
+const REFERENCE_TEXT_SIGNAL_MULTIPLIER: f32 = 0.6;
+const LOW_SIGNAL_TEXT_MULTIPLIER: f32 = 0.25;
 
 /// Cap how many results from a single document appear in the top N.
 /// Avoids the "all hits clustered in one doc" failure mode.
@@ -74,6 +77,8 @@ pub struct ScoreParts {
     /// Query-INDEPENDENT graph signal — avg edge weight to all neighbors.
     /// Applied as a gated tie-breaker only.
     pub score_centrality: f32,
+    pub doc_class: Option<String>,
+    pub chunk_signal: Option<String>,
 }
 
 impl ScoreParts {
@@ -85,6 +90,8 @@ impl ScoreParts {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 0.0,
+            doc_class: None,
+            chunk_signal: None,
         }
     }
 
@@ -92,13 +99,30 @@ impl ScoreParts {
     fn relevance(&self) -> f32 {
         self.score_vec.max(self.score_bm25).max(self.score_entity)
     }
+
+    fn is_low_signal(&self) -> bool {
+        matches!(
+            self.chunk_signal.as_deref(),
+            Some("anchor_list") | Some("metadata")
+        )
+    }
 }
 
 pub fn final_score(s: &ScoreParts) -> f32 {
-    let base = W_VEC * s.score_vec
-        + W_BM25 * s.score_bm25
-        + W_GRAPH * s.score_graph
-        + W_ENTITY * s.score_entity;
+    let text_multiplier = if s.doc_class.as_deref() == Some("reference") {
+        REFERENCE_TEXT_SIGNAL_MULTIPLIER
+    } else {
+        1.0
+    };
+    let low_signal_multiplier = if s.is_low_signal() {
+        LOW_SIGNAL_TEXT_MULTIPLIER
+    } else {
+        1.0
+    };
+    let text_score =
+        (W_VEC * s.score_vec + W_BM25 * s.score_bm25) * text_multiplier * low_signal_multiplier;
+    let entity_score = W_ENTITY * s.score_entity * low_signal_multiplier;
+    let base = text_score + W_GRAPH * s.score_graph + entity_score;
     let centrality_bonus = if s.relevance() >= CENTRALITY_RELEVANCE_GATE {
         W_CENTRALITY_TIEBREAK * s.score_centrality
     } else {
@@ -162,6 +186,10 @@ pub fn run_query(
             .score_entity = *score;
     }
 
+    if !pool.is_empty() {
+        populate_chunk_metadata(conn, &mut pool)?;
+    }
+
     // (4) Graph expansion at depth > 0: add chunks reachable from top seeds.
     if opts.depth > 0 && !pool.is_empty() {
         let seeds = top_seed_ids(&pool, 10);
@@ -177,6 +205,7 @@ pub fn run_query(
     // CENTRALITY_RELEVANCE_GATE so hubs can't surface on weak matches).
     if !pool.is_empty() {
         populate_centrality(conn, &mut pool)?;
+        populate_chunk_metadata(conn, &mut pool)?;
     }
 
     // (6) Score, sort, diversify per-doc
@@ -187,7 +216,12 @@ pub fn run_query(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let selected = diversify_per_doc(conn, scored, opts.limit, MAX_RESULTS_PER_DOC)?;
+    let selected = diversify_per_doc(
+        conn,
+        prefer_content_chunks(scored),
+        opts.limit,
+        MAX_RESULTS_PER_DOC,
+    )?;
 
     // (7) Materialize QueryResult rows
     let mut results = Vec::with_capacity(selected.len());
@@ -231,6 +265,7 @@ pub fn query_with_embedding(
             .score_vec = *score;
     }
     populate_centrality(conn, &mut pool)?;
+    populate_chunk_metadata(conn, &mut pool)?;
 
     let mut scored: Vec<ScoreParts> = pool.into_values().collect();
     scored.sort_by(|a, b| {
@@ -239,7 +274,12 @@ pub fn query_with_embedding(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let selected = diversify_per_doc(conn, scored, limit, MAX_RESULTS_PER_DOC)?;
+    let selected = diversify_per_doc(
+        conn,
+        prefer_content_chunks(scored),
+        limit,
+        MAX_RESULTS_PER_DOC,
+    )?;
     let mut results = Vec::new();
     for s in selected {
         let total = final_score(&s);
@@ -388,6 +428,16 @@ fn top_seed_ids(pool: &HashMap<String, ScoreParts>, n: usize) -> Vec<String> {
             .partial_cmp(&final_score(a))
             .unwrap_or(std::cmp::Ordering::Equal)
     });
+    let content: Vec<String> = ranked
+        .iter()
+        .copied()
+        .filter(|s| !s.is_low_signal())
+        .take(n)
+        .map(|s| s.chunk_id.clone())
+        .collect();
+    if !content.is_empty() {
+        return content;
+    }
     ranked
         .into_iter()
         .take(n)
@@ -419,9 +469,16 @@ fn expand_via_graph(
             CASE WHEN src_chunk = ?1 THEN dst_chunk ELSE src_chunk END AS neighbor,
             weight
         FROM graph_edges
-        WHERE src_chunk = ?1 OR dst_chunk = ?1
+        JOIN chunks neighbor_chunk ON neighbor_chunk.id = CASE
+            WHEN src_chunk = ?1 THEN dst_chunk
+            ELSE src_chunk
+        END
+        WHERE (src_chunk = ?1 OR dst_chunk = ?1)
+          AND edge_type IN ('shared_anchor', 'shared_entity', 'semantic')
+          AND weight >= ?2
+          AND neighbor_chunk.chunk_signal = 'content'
         ORDER BY weight DESC
-        LIMIT ?2
+        LIMIT ?3
         "#,
     )?;
 
@@ -429,9 +486,10 @@ fn expand_via_graph(
         if hops >= depth {
             continue;
         }
-        let rows = neighbor_stmt.query_map(params![current, EXPANSION_FANOUT as i64], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)? as f32))
-        })?;
+        let rows = neighbor_stmt.query_map(
+            params![current, STRONG_EDGE_THRESHOLD, EXPANSION_FANOUT as i64],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)? as f32)),
+        )?;
         for row in rows {
             let (neighbor, weight) = row?;
             // Skip echo back to a seed.
@@ -500,6 +558,60 @@ fn populate_centrality(
         }
     }
     Ok(())
+}
+
+fn populate_chunk_metadata(
+    conn: &Connection,
+    pool: &mut HashMap<String, ScoreParts>,
+) -> Result<(), EngineError> {
+    if pool.is_empty() {
+        return Ok(());
+    }
+    let ids: Vec<String> = pool.keys().cloned().collect();
+    let placeholders = std::iter::repeat("?")
+        .take(ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        r#"
+        SELECT c.id, d.doc_class, c.chunk_signal
+        FROM chunks c
+        JOIN documents d ON d.id = c.doc_id
+        WHERE c.id IN ({})
+        "#,
+        placeholders
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let metadata: HashMap<String, (String, String)> = stmt
+        .query_map(params_from_iter(ids.iter().map(|s| s.as_str())), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                (row.get::<_, String>(1)?, row.get::<_, String>(2)?),
+            ))
+        })?
+        .collect::<Result<HashMap<_, _>, _>>()?;
+
+    for (id, parts) in pool.iter_mut() {
+        if let Some((class, signal)) = metadata.get(id) {
+            parts.doc_class = Some(class.clone());
+            parts.chunk_signal = Some(signal.clone());
+        }
+    }
+    Ok(())
+}
+
+fn prefer_content_chunks(sorted_scores: Vec<ScoreParts>) -> Vec<ScoreParts> {
+    let mut content = Vec::with_capacity(sorted_scores.len());
+    let mut low_signal = Vec::new();
+    for score in sorted_scores {
+        if score.is_low_signal() {
+            low_signal.push(score);
+        } else {
+            content.push(score);
+        }
+    }
+    content.extend(low_signal);
+    content
 }
 
 /// Greedily take top-scored chunks, but cap how many can come from the same
@@ -596,6 +708,8 @@ mod tests {
             score_graph: 1.0,
             score_entity: 1.0,
             score_centrality: 0.0,
+            doc_class: None,
+            chunk_signal: None,
         };
         // 35 + 40 + 15 + 10 = 100.
         assert!((final_score(&parts) - 1.0).abs() < 1e-6);
@@ -610,8 +724,54 @@ mod tests {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 0.0,
+            doc_class: None,
+            chunk_signal: None,
         };
         assert!((final_score(&parts) - 0.35).abs() < 1e-6);
+    }
+
+    #[test]
+    fn final_score_downranks_reference_doc_text_signals() {
+        let content = ScoreParts {
+            chunk_id: "content".into(),
+            score_bm25: 1.0,
+            score_vec: 1.0,
+            score_graph: 0.0,
+            score_entity: 0.0,
+            score_centrality: 0.0,
+            doc_class: Some("content".into()),
+            chunk_signal: None,
+        };
+        let reference = ScoreParts {
+            chunk_id: "reference".into(),
+            doc_class: Some("reference".into()),
+            ..content.clone()
+        };
+
+        assert!((final_score(&content) - 0.75).abs() < 1e-6);
+        assert!((final_score(&reference) - 0.45).abs() < 1e-6);
+    }
+
+    #[test]
+    fn final_score_downranks_low_signal_chunks() {
+        let content = ScoreParts {
+            chunk_id: "content".into(),
+            score_bm25: 1.0,
+            score_vec: 1.0,
+            score_graph: 0.0,
+            score_entity: 1.0,
+            score_centrality: 0.0,
+            doc_class: Some("content".into()),
+            chunk_signal: Some("content".into()),
+        };
+        let anchor_list = ScoreParts {
+            chunk_id: "anchors".into(),
+            chunk_signal: Some("anchor_list".into()),
+            ..content.clone()
+        };
+
+        assert!(final_score(&content) > final_score(&anchor_list));
+        assert!((final_score(&anchor_list) - 0.2125).abs() < 1e-6);
     }
 
     #[test]
@@ -625,6 +785,8 @@ mod tests {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 1.0,
+            doc_class: None,
+            chunk_signal: None,
         };
         assert!(final_score(&parts).abs() < 1e-6);
     }
@@ -640,6 +802,8 @@ mod tests {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 1.0,
+            doc_class: None,
+            chunk_signal: None,
         };
         // base = 0.35 * 0.5 = 0.175; centrality bonus = 0.05; total = 0.225.
         assert!((final_score(&parts) - 0.225).abs() < 1e-6);
@@ -655,6 +819,8 @@ mod tests {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 1.0, // very well connected
+            doc_class: None,
+            chunk_signal: None,
         };
         let precise = ScoreParts {
             chunk_id: "answer".into(),
@@ -663,6 +829,8 @@ mod tests {
             score_graph: 0.0,
             score_entity: 0.0,
             score_centrality: 0.10, // isolated
+            doc_class: None,
+            chunk_signal: None,
         };
         assert!(
             final_score(&precise) > final_score(&hub),
@@ -706,6 +874,27 @@ mod tests {
             .collect();
         assert!(docs.contains(&"doc-a"));
         assert!(docs.contains(&"doc-b"));
+    }
+
+    #[test]
+    fn content_chunks_are_preferred_before_low_signal_fallback() {
+        let scores = vec![
+            ScoreParts {
+                score_vec: 1.0,
+                chunk_signal: Some("anchor_list".into()),
+                ..ScoreParts::new("anchors".into())
+            },
+            ScoreParts {
+                score_vec: 0.5,
+                chunk_signal: Some("content".into()),
+                ..ScoreParts::new("answer".into())
+            },
+        ];
+
+        let ordered = prefer_content_chunks(scores);
+
+        assert_eq!(ordered[0].chunk_id, "answer");
+        assert_eq!(ordered[1].chunk_id, "anchors");
     }
 
     #[test]
@@ -780,5 +969,40 @@ mod tests {
         // With no BM25 / entity matches and zero embedding, result set may be
         // empty but the call MUST NOT panic and MUST NOT touch graph_edges.
         let _ = out;
+    }
+
+    #[test]
+    fn graph_expansion_follows_only_strong_relation_edges() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        seed_kb(&mut conn);
+        conn.execute(
+            "INSERT INTO documents (id,path,filename,format,size_bytes,hash,indexed_at,status)
+             VALUES ('doc-c','c.md','c.md','md',1,'h','2026-05-21T00:00:00Z','indexed')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO chunks (id,doc_id,chunk_index,content,char_start,char_end,created_at)
+            VALUES
+              ('c1','doc-c',0,'same doc neighbor',0,17,'2026-05-21T00:00:00Z'),
+              ('c2','doc-c',1,'weak topk neighbor',0,18,'2026-05-21T00:00:00Z'),
+              ('c3','doc-c',2,'weak entity neighbor',0,20,'2026-05-21T00:00:00Z'),
+              ('c4','doc-c',3,'anchor neighbor',0,15,'2026-05-21T00:00:00Z');
+            INSERT INTO graph_edges (src_chunk,dst_chunk,weight,edge_type)
+            VALUES
+              ('a1','c1',0.9,'same_doc'),
+              ('a1','c2',0.9,'semantic_topk'),
+              ('a1','c3',0.61,'shared_entity'),
+              ('a1','c4',0.9,'shared_anchor');
+            "#,
+        )
+        .unwrap();
+
+        let expansion = expand_via_graph(&conn, &["a1".to_string()], 1).unwrap();
+        let ids: Vec<String> = expansion.into_iter().map(|(id, _)| id).collect();
+
+        assert_eq!(ids, vec!["c4".to_string()]);
     }
 }

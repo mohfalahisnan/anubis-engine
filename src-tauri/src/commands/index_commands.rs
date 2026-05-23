@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, State};
 
 use crate::commands::engine_or_error;
@@ -25,10 +26,14 @@ pub async fn index_file(path: String, state: State<'_, EngineHandle>) -> Result<
 }
 
 #[tauri::command]
-pub async fn remove_document(
-    doc_id: String,
-    state: State<'_, EngineHandle>,
-) -> Result<(), String> {
+pub async fn cancel_indexing(state: State<'_, EngineHandle>) -> Result<(), String> {
+    let engine = engine_or_error(&state)?;
+    engine.cancel_token.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_document(doc_id: String, state: State<'_, EngineHandle>) -> Result<(), String> {
     let engine = engine_or_error(&state)?;
     let chunk_ids = {
         let db = engine.db.lock().await;

@@ -37,6 +37,8 @@ type Props = {
 const formatIcon: Record<string, React.ComponentType<{ className?: string }>> = {
   md: FileText,
   text: FileText,
+  csv: FileSpreadsheet,
+  json: FileCode2,
   pdf: FileType,
   docx: FileCode2,
   xlsx: FileSpreadsheet,

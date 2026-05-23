@@ -37,6 +37,7 @@ pub fn parse(path: &Path) -> Result<ParsedDoc, EngineError> {
         format: DocFormat::Pdf,
         pages,
         metadata,
+        doc_class: Default::default(),
     })
 }
 

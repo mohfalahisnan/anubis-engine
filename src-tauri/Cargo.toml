@@ -1,6 +1,6 @@
 [package]
 name = "anubis-engine"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.71"
 
@@ -21,6 +21,7 @@ pulldown-cmark = "0.13"
 lopdf = "0.40"
 docx-rs = "0.4"
 calamine = { version = "0.35", features = ["dates"] }
+csv = "1.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "tiff"] }
 ocrs = "0.12"
 rten = "0.24"
@@ -43,12 +44,15 @@ chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.5"
 notify = "8.0"
 anyhow = "1.0"
-ffmpeg-sidecar = "2"
-# Note: we intentionally invoke whisper.cpp as a subprocess (binary
-# auto-downloaded at runtime) instead of using whisper-rs. The latter pulls
+regex = "1"
+# Note: we intentionally invoke ffmpeg AND whisper.cpp as subprocesses
+# (binaries auto-downloaded at runtime). For Whisper, `whisper-rs` would pull
 # in `bindgen` which needs libclang on the build host — a hard install for
-# users on a fresh Windows machine. The subprocess path keeps the build
-# dependency surface flat.
+# users on a fresh Windows machine. For ffmpeg, `ffmpeg-sidecar`'s downloader
+# is silent (no UI progress), wants to write next to the running exe (which
+# Tauri puts in Program Files), and hides ffmpeg's stderr — so we shell out
+# to a raw `Command` with full stdio control instead. The subprocess path
+# keeps the build dependency surface flat.
 zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [build-dependencies]

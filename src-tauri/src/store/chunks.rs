@@ -2,7 +2,7 @@ use chrono::Utc;
 use rusqlite::{params, Connection};
 
 use crate::{
-    types::{Chunk, QueryResult},
+    types::{Chunk, ChunkSignal, QueryResult},
     EngineError,
 };
 
@@ -19,9 +19,9 @@ pub fn replace_doc_chunks(
         tx.execute(
             r#"
             INSERT INTO chunks (
-                id, doc_id, chunk_index, content, char_start, char_end, page, created_at
+                id, doc_id, chunk_index, content, char_start, char_end, page, chunk_signal, created_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
             params![
                 chunk.id,
@@ -31,6 +31,7 @@ pub fn replace_doc_chunks(
                 chunk.char_start as i64,
                 chunk.char_end as i64,
                 chunk.page.map(|page| page as i64),
+                chunk.signal.as_str(),
                 created_at
             ],
         )?;
@@ -43,7 +44,7 @@ pub fn replace_doc_chunks(
 pub fn get_doc_chunks(conn: &Connection, doc_id: &str) -> Result<Vec<Chunk>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, doc_id, chunk_index, content, char_start, char_end, page
+        SELECT id, doc_id, chunk_index, content, char_start, char_end, page, chunk_signal
         FROM chunks
         WHERE doc_id = ?1
         ORDER BY chunk_index ASC
@@ -70,7 +71,7 @@ pub fn query_result_for_chunk(
 ) -> Result<Option<QueryResult>, EngineError> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT c.id, c.doc_id, c.content, d.filename, c.page
+        SELECT c.id, c.doc_id, c.content, d.filename, c.page, c.chunk_signal
         FROM chunks c
         JOIN documents d ON d.id = c.doc_id
         WHERE c.id = ?1 AND d.status = 'indexed'
@@ -85,6 +86,7 @@ pub fn query_result_for_chunk(
             content: row.get(2)?,
             filename: row.get(3)?,
             page: row.get::<_, Option<i64>>(4)?.map(|page| page as u32),
+            chunk_signal: ChunkSignal::from_db(&row.get::<_, String>(5)?),
             score,
             score_bm25,
             score_vec,
@@ -98,6 +100,7 @@ pub fn query_result_for_chunk(
 
 fn row_to_chunk(row: &rusqlite::Row<'_>) -> rusqlite::Result<Chunk> {
     let page: Option<i64> = row.get(6)?;
+    let signal: String = row.get(7)?;
     Ok(Chunk {
         id: row.get(0)?,
         doc_id: row.get(1)?,
@@ -106,6 +109,7 @@ fn row_to_chunk(row: &rusqlite::Row<'_>) -> rusqlite::Result<Chunk> {
         char_start: row.get::<_, i64>(4)? as usize,
         char_end: row.get::<_, i64>(5)? as usize,
         page: page.map(|value| value as u32),
+        signal: ChunkSignal::from_db(&signal),
     })
 }
 
@@ -131,6 +135,7 @@ mod tests {
             char_start: 0,
             char_end: 14,
             page: None,
+            signal: crate::types::ChunkSignal::Content,
         }];
 
         replace_doc_chunks(&mut conn, "doc-1", &chunks).expect("replace chunks");

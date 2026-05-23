@@ -1,6 +1,9 @@
 use uuid::Uuid;
 
-use crate::types::{Chunk, ParsedDoc};
+use crate::{
+    chunker::signal::classify_chunk_signal,
+    types::{Chunk, ParsedDoc},
+};
 
 pub const DEFAULT_WINDOW_SIZE: usize = 512;
 pub const DEFAULT_OVERLAP: usize = 64;
@@ -59,6 +62,7 @@ pub fn chunk_text(
 
         if end - start >= min_chunk {
             let content: String = chars[start..end].iter().collect();
+            let signal = classify_chunk_signal(&content);
             chunks.push(Chunk {
                 id: Uuid::new_v4().to_string(),
                 doc_id: doc_id.to_string(),
@@ -67,6 +71,7 @@ pub fn chunk_text(
                 char_start: start,
                 char_end: end,
                 page: None,
+                signal,
             });
         }
 

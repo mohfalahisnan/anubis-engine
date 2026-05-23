@@ -1,12 +1,12 @@
 pub mod protocol;
 pub mod tools;
 
-use std::io::{self, BufRead, Write};
 use serde_json::{json, Value};
+use std::io::{self, BufRead, Write};
 use tokio::runtime::Runtime;
 
 use crate::engine::state::AppState;
-use protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError, InitializeResult, ServerInfo};
+use protocol::{InitializeResult, JsonRpcError, JsonRpcRequest, JsonRpcResponse, ServerInfo};
 
 fn get_db_path() -> Result<std::path::PathBuf, String> {
     if let Some(path) = std::env::var_os("ANUBIS_DB_PATH") {
@@ -30,8 +30,7 @@ fn default_app_data_dir() -> Result<std::path::PathBuf, String> {
     {
         // Tauri's app_data_dir on Windows uses ROAMING (%APPDATA%), not LOCAL.
         // The MCP server must match so it sees the same database the UI writes to.
-        let appdata = std::env::var("APPDATA")
-            .map_err(|_| "APPDATA not set".to_string())?;
+        let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
         Ok(std::path::PathBuf::from(appdata).join("com.anubis-os.app"))
     }
     #[cfg(target_os = "macos")]
@@ -51,9 +50,7 @@ fn default_app_data_dir() -> Result<std::path::PathBuf, String> {
 
 pub fn run_stdio() -> Result<(), Box<dyn std::error::Error>> {
     let rt = Runtime::new()?;
-    rt.block_on(async {
-        run_async().await
-    })
+    rt.block_on(async { run_async().await })
 }
 
 async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,7 +62,7 @@ async fn run_async() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = AppState::new(&db_path, &fts_path)
         .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
-    
+
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut reader = stdin.lock();
@@ -116,25 +113,23 @@ async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpc
     }
 
     match req.method.as_str() {
-        "initialize" => {
-            Some(JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                id,
-                result: Some(json!(InitializeResult {
-                    protocolVersion: "2025-06-18".to_string(),
-                    capabilities: json!({
-                        "tools": {
-                            "listChanged": false
-                        }
-                    }),
-                    serverInfo: ServerInfo {
-                        name: "anubis-engine".to_string(),
-                        version: env!("CARGO_PKG_VERSION").to_string(),
+        "initialize" => Some(JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: Some(json!(InitializeResult {
+                protocolVersion: "2025-06-18".to_string(),
+                capabilities: json!({
+                    "tools": {
+                        "listChanged": false
                     }
-                })),
-                error: None,
-            })
-        }
+                }),
+                serverInfo: ServerInfo {
+                    name: "anubis-engine".to_string(),
+                    version: env!("CARGO_PKG_VERSION").to_string(),
+                }
+            })),
+            error: None,
+        }),
         "notifications/initialized" => {
             // Nothing to reply for notifications
             None
@@ -175,7 +170,7 @@ async fn handle_request(state: &AppState, req: JsonRpcRequest) -> Option<JsonRpc
                     code: -32602,
                     message: "Invalid params for tools/call".to_string(),
                     data: None,
-                })
+                }),
             })
         }
         _ => {

@@ -16,8 +16,7 @@ use fastembed::{
 use crate::engine::download::{ensure_file, ensure_file_quiet};
 use crate::EngineError;
 
-const HF_BASE: &str =
-    "https://huggingface.co/intfloat/multilingual-e5-small/resolve/main";
+const HF_BASE: &str = "https://huggingface.co/intfloat/multilingual-e5-small/resolve/main";
 const MODEL_DIR_NAME: &str = "embedding-multilingual-e5-small";
 const EVENT_ID: &str = "embedding";
 const LABEL: &str = "Embedding model (multilingual-e5-small)";
@@ -79,8 +78,8 @@ pub fn load_or_download() -> Result<TextEmbedding, EngineError> {
             .map_err(|error| EngineError::Embed(error.to_string()))?,
     };
 
-    let model = UserDefinedEmbeddingModel::new(onnx_bytes, tokenizer_files)
-        .with_pooling(Pooling::Mean);
+    let model =
+        UserDefinedEmbeddingModel::new(onnx_bytes, tokenizer_files).with_pooling(Pooling::Mean);
 
     TextEmbedding::try_new_from_user_defined(model, InitOptionsUserDefined::default())
         .map_err(|error| EngineError::Embed(error.to_string()))

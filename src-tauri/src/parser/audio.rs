@@ -1,26 +1,17 @@
 use std::path::Path;
 
 use crate::{
-    parser::metadata_for_path,
-    transcription::engine::transcribe_file,
-    types::{DocFormat, ParsedDoc, ParsedPage},
+    parser::video,
+    types::{DocFormat, ParsedDoc},
     EngineError,
 };
 
 pub fn parse(path: &Path) -> Result<ParsedDoc, EngineError> {
-    let metadata = metadata_for_path(path)?;
-    let text = transcribe_file(path)?;
-    Ok(ParsedDoc {
-        doc_id: uuid::Uuid::new_v4().to_string(),
-        path: path.to_string_lossy().into_owned(),
-        format: DocFormat::Audio,
-        pages: vec![ParsedPage {
-            page_num: None,
-            text,
-            images: Vec::new(),
-        }],
-        metadata,
-    })
+    // Audio files share the exact same transcription pipeline as videos —
+    // ffmpeg decodes the audio stream to 16 kHz mono PCM and whisper takes
+    // it from there. Reuse the video parser to keep the "no audio track"
+    // soft-error behaviour consistent.
+    video::parse_with_format(path, DocFormat::Audio)
 }
 
 #[cfg(test)]

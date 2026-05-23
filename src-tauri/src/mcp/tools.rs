@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use crate::embedder::local;
 use crate::engine::{indexer, state::AppState};
 use crate::mcp::protocol::{CallToolResult, ListToolsResult, Tool, ToolContent};
+use crate::query::context_pack::{build_context_pack, ContextPackOpts};
 use crate::query::hybrid::{run_query, QueryOpts};
 use crate::store::{chunks, db, graph_store};
 
@@ -19,6 +20,21 @@ pub fn list_tools() -> ListToolsResult {
                         "q": { "type": "string", "description": "Search query." },
                         "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
                         "depth": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 }
+                    },
+                    "required": ["q"]
+                }),
+            ),
+            tool(
+                "anubis_context_pack",
+                "Build a compact, deterministic, citation-preserving context pack for AI use from Anubis search results and evidence-backed graph relations.",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "q": { "type": "string", "description": "Search query to pack context for." },
+                        "budget_tokens": { "type": "integer", "minimum": 1, "maximum": 200000, "default": 6000 },
+                        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
+                        "depth": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 },
+                        "include_graph": { "type": "boolean", "default": true }
                     },
                     "required": ["q"]
                 }),
@@ -68,7 +84,7 @@ pub fn list_tools() -> ListToolsResult {
             ),
             tool(
                 "anubis_get_chunk_neighbors",
-                "Return graph neighbors for one chunk.",
+                "Return graph neighbors for one chunk. Each returned relation carries edge_type, edge_reason, and (where applicable) an evidence block showing the literal shared anchor and the spans where it appears in both chunks. Only claim two documents are content-related when evidence.kind is shared_anchor or shared_entity and both src_span and dst_span are present. A semantic relation is similarity-only; a manifest relation means the docs are listed together in a reference file.",
                 json!({
                     "type": "object",
                     "properties": {
@@ -90,7 +106,7 @@ pub fn list_tools() -> ListToolsResult {
             ),
             tool(
                 "anubis_get_graph_neighborhood",
-                "Return graph nodes and edges around one chunk.",
+                "Return graph nodes and edges around one chunk. Each returned relation carries edge_type, edge_reason, and (where applicable) an evidence block showing the literal shared anchor and the spans where it appears in both chunks. Only claim two documents are content-related when evidence.kind is shared_anchor or shared_entity and both src_span and dst_span are present. A semantic relation is similarity-only; a manifest relation means the docs are listed together in a reference file.",
                 json!({
                     "type": "object",
                     "properties": {
@@ -127,6 +143,36 @@ async fn dispatch(state: &AppState, name: &str, arguments: Value) -> Result<Valu
             let results = run_query(&db, &fts, &q, &query_embedding, QueryOpts { limit, depth })
                 .map_err(|e| e.to_string())?;
             to_json(results)
+        }
+        "anubis_context_pack" => {
+            let q = string_arg(&arguments, "q")?;
+            let budget_tokens = usize_arg(&arguments, "budget_tokens")?
+                .unwrap_or(6000)
+                .min(200_000);
+            let limit = usize_arg(&arguments, "limit")?.unwrap_or(10).min(50);
+            let depth = usize_arg(&arguments, "depth")?.unwrap_or(1).min(3);
+            let include_graph = bool_arg(&arguments, "include_graph")?.unwrap_or(true);
+            let query_embedding = {
+                let mut embedder = state.embedder.lock().await;
+                local::embed_query(&mut embedder, &q).map_err(|e| e.to_string())?
+            };
+            let db = state.db.lock().await;
+            let fts = state.fts.lock().await;
+            let results = run_query(&db, &fts, &q, &query_embedding, QueryOpts { limit, depth })
+                .map_err(|e| e.to_string())?;
+            let pack = build_context_pack(
+                &db,
+                &q,
+                &results,
+                ContextPackOpts {
+                    budget_tokens,
+                    limit,
+                    depth,
+                    include_graph,
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            to_json(pack)
         }
         "anubis_index_file" => {
             let path = string_arg(&arguments, "path")?;
@@ -195,8 +241,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Tool {
 }
 
 fn tool_result(structured: Value) -> CallToolResult {
-    let text =
-        serde_json::to_string_pretty(&structured).unwrap_or_else(|_| structured.to_string());
+    let text = serde_json::to_string_pretty(&structured).unwrap_or_else(|_| structured.to_string());
     CallToolResult {
         content: vec![ToolContent::Text { text }],
         structuredContent: Some(structured),
@@ -239,16 +284,27 @@ fn usize_arg(arguments: &Value, name: &str) -> Result<Option<usize>, String> {
         .map_err(|error| format!("Invalid integer argument {name}: {error}"))
 }
 
+fn bool_arg(arguments: &Value, name: &str) -> Result<Option<bool>, String> {
+    let Some(value) = arguments.get(name) else {
+        return Ok(None);
+    };
+    value
+        .as_bool()
+        .map(Some)
+        .ok_or_else(|| format!("Invalid boolean argument: {name}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::list_tools;
 
     #[test]
-    fn lists_all_nine_tools() {
+    fn lists_all_ten_tools() {
         let result = list_tools();
         let names: Vec<&str> = result.tools.iter().map(|t| t.name.as_str()).collect();
         for expected in [
             "anubis_search",
+            "anubis_context_pack",
             "anubis_index_file",
             "anubis_index_folder",
             "anubis_get_index_stats",

@@ -27,12 +27,16 @@ pub fn build_edges(
         for right in (left + 1)..current_chunks.len() {
             let l = &current_chunks[left];
             let r = &current_chunks[right];
+            if l.signal.is_low_signal() || r.signal.is_low_signal() {
+                continue;
+            }
 
-            raw.push(GraphEdge::canonical(
+            raw.push(GraphEdge::canonical_with_reason(
                 &l.id,
                 &r.id,
                 SAME_DOC_WEIGHT,
                 "same_doc",
+                Some("same_doc".to_string()),
             ));
 
             if let (Some(le), Some(re)) =
@@ -40,7 +44,13 @@ pub fn build_edges(
             {
                 let sim = cosine_sim(le, re);
                 if sim >= SEMANTIC_THRESHOLD {
-                    raw.push(GraphEdge::canonical(&l.id, &r.id, sim, "semantic"));
+                    raw.push(GraphEdge::canonical_with_reason(
+                        &l.id,
+                        &r.id,
+                        sim,
+                        "semantic",
+                        Some(format!("cos:{sim:.2}")),
+                    ));
                 }
             }
         }
@@ -48,6 +58,9 @@ pub fn build_edges(
 
     // Cross-document: top-K semantic neighbors per current chunk + threshold.
     for (idx, chunk) in current_chunks.iter().enumerate() {
+        if chunk.signal.is_low_signal() {
+            continue;
+        }
         let Some(current_embedding) = current_embeddings.get(idx) else {
             continue;
         };
@@ -68,7 +81,13 @@ pub fn build_edges(
             } else {
                 "semantic_topk"
             };
-            raw.push(GraphEdge::canonical(&chunk.id, &other_id, sim, edge_type));
+            raw.push(GraphEdge::canonical_with_reason(
+                &chunk.id,
+                &other_id,
+                sim,
+                edge_type,
+                Some(format!("cos:{sim:.2}")),
+            ));
         }
     }
 
@@ -108,6 +127,7 @@ mod tests {
             char_start: 0,
             char_end: 0,
             page: None,
+            signal: crate::types::ChunkSignal::Content,
         }
     }
 
@@ -136,5 +156,20 @@ mod tests {
         assert!(!edges
             .iter()
             .any(|e| e.src_chunk == "d1" || e.dst_chunk == "d1"));
+    }
+
+    #[test]
+    fn low_signal_chunks_do_not_create_graph_edges() {
+        let mut anchor_list = chunk("a1", "doc-a");
+        anchor_list.signal = crate::types::ChunkSignal::AnchorList;
+        let chunks = vec![anchor_list, chunk("a2", "doc-a")];
+        let embs = vec![vec![1.0, 0.0], vec![1.0, 0.0]];
+        let existing = vec![("b1".to_string(), "doc-b".to_string(), vec![1.0, 0.0])];
+
+        let edges = build_edges(&chunks, &embs, &existing);
+
+        assert!(edges
+            .iter()
+            .all(|edge| edge.src_chunk != "a1" && edge.dst_chunk != "a1"));
     }
 }

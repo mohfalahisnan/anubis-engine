@@ -5,7 +5,7 @@ use crate::{
     embedder::local,
     engine::state::EngineHandle,
     query::hybrid::{run_query, QueryOpts},
-    store::{chunks, graph_store, graph_store::GraphOverview},
+    store::{chunks, graph_store, graph_store::GraphNeighbor, graph_store::GraphOverview},
     types::{Chunk, QueryResult},
 };
 
@@ -28,14 +28,8 @@ pub async fn query(
 
     let db = engine.db.lock().await;
     let fts = engine.fts.lock().await;
-    run_query(
-        &db,
-        &fts,
-        &q,
-        &query_embedding,
-        QueryOpts { limit, depth },
-    )
-    .map_err(|error| error.to_string())
+    run_query(&db, &fts, &q, &query_embedding, QueryOpts { limit, depth })
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -43,7 +37,7 @@ pub async fn get_chunk_neighbors(
     chunk_id: String,
     depth: Option<usize>,
     state: State<'_, EngineHandle>,
-) -> Result<Vec<QueryResult>, String> {
+) -> Result<Vec<GraphNeighbor>, String> {
     let engine = engine_or_error(&state)?;
     let db = engine.db.lock().await;
     graph_store::chunk_neighbors(&db, &chunk_id, depth.unwrap_or(1) * 50)
