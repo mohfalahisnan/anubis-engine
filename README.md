@@ -1,3 +1,14 @@
+> [!WARNING]
+> This repository is managed by AI.
+>
+> Please review carefully before using, modifying, or merging any code from this repository.  
+> Some parts may have been generated or modified automatically, so manual review is still required to ensure:
+>
+> - The code meets the project requirements
+> - There are no bugs or regressions
+> - No sensitive information is included
+> - Security and quality standards are maintained
+
 # Anubis Engine
 
 Anubis Engine is a local-first Tauri app for indexing a workspace, building a
