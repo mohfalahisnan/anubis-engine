@@ -4,11 +4,59 @@ on:
   push:
     branches:
       - main
-  # You can trigger this manually from the Actions tab
+    tags:
+      - "app-v*"
   workflow_dispatch:
 
 jobs:
+  create-release-tag:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Read app version
+        id: app-version
+        shell: bash
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          package_version="$(node -p "require('./package.json').version")"
+          cargo_version="$(node -e "const fs = require('fs'); const toml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8'); const match = toml.match(/^version = \"([^\"]+)\"/m); if (!match) process.exit(1); console.log(match[1]);")"
+
+          if [ "$version" != "$package_version" ] || [ "$version" != "$cargo_version" ]; then
+            echo "Version mismatch: tauri=$version package=$package_version cargo=$cargo_version" >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=app-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create version tag
+        shell: bash
+        run: |
+          tag="${{ steps.app-version.outputs.tag }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Release tag $tag already exists; skipping tag creation."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
+
   build-tauri:
+    if: startsWith(github.ref, 'refs/tags/app-v')
     permissions:
       contents: write
 
@@ -34,6 +82,17 @@ jobs:
         with:
           node-version: lts/*
 
+      - name: Validate release tag
+        shell: bash
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          expected_tag="app-v$version"
+
+          if [ "${GITHUB_REF_NAME}" != "$expected_tag" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match app version $version (expected $expected_tag)." >&2
+            exit 1
+          fi
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -45,15 +104,15 @@ jobs:
           workspaces: "./src-tauri -> target"
 
       - name: Install NPM dependencies
-        run: npm install
+        run: npm ci
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__
+          tagName: ${{ github.ref_name }}
           releaseName: "Anubis OS v__VERSION__"
           releaseBody: "Automated build of Anubis OS"
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
